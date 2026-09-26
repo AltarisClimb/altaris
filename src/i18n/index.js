@@ -63,4 +63,13 @@ function relDays(dateStr){
   return n > 0 ? "il y a " + n + " j" : "dans " + (-n) + " j";
 }
 
-export { DICTS, LANG, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, pickLang, relDays, t };
+/** Temps écoulé depuis un instant (ms) : « à l'instant », « il y a 5 min », « il y a 3 h », puis en jours. */
+function relTime(ts, now){
+  const min = Math.floor(((now || Date.now()) - ts) / 60000);
+  if (min < 2) return t("g.justNow");
+  if (min < 60) return t("g.minAgo", { n: min });
+  if (min < 24 * 60) return t("g.hAgo", { n: Math.floor(min / 60) });
+  return relDays(new Date(ts).toISOString().slice(0, 10));
+}
+
+export { DICTS, LANG, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, pickLang, relDays, relTime, t };

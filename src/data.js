@@ -188,6 +188,8 @@ const Store = {
   async syncRemote(){
     if (!Remote.client || !Session.user) return;
     await this.flushRemote();
+    /* Comptes relus aussi : rôles, rattachements et « vu il y a… » à jour. */
+    try{ this.mergeUsers(await Remote.profiles()); }catch(e){ /* hors ligne : cache */ }
     for (const col of REMOTE_COLS){
       let rows;
       try{ rows = await Remote.docs(col); }catch(e){ continue; }             // hors ligne : on garde le cache
@@ -294,6 +296,13 @@ const Store = {
       this.saveLocal();
       if (!this.silent) requestRender();
     }, (row) => this.addMessage(row));
+    /* Présence : le grimpeur rejoint son propre canal, un encadrant ceux de ses grimpeurs. */
+    const me = Session.live();
+    if (me){
+      const ids = me.role === "climber" ? [me.id] : Access.climbers().map(c => c.id);
+      Remote.startPresence(me.id, ids, () => { if (!this.silent) requestRender(); });
+      Remote.touchSeen(me.id).catch(() => {});
+    }
   },
 
   /** Sign-out on a shared device: drop what the server gives back at the next
@@ -346,6 +355,10 @@ if (typeof window !== "undefined"){
   /* Filet si le temps réel est coupé : on resynchronise au retour sur l'onglet. */
   let _lastSync = 0;
   window.addEventListener("focus", () => { if (Date.now() - _lastSync > 30000){ _lastSync = Date.now(); Store.syncRemote(); } });
+  /* « Vu il y a… » : activité notée au retour sur l'appli et toutes les 5 minutes. */
+  const seen = () => { if (Remote.client && Session.user && document.visibilityState === "visible") Remote.touchSeen(Session.user.id).catch(() => {}); };
+  document.addEventListener("visibilitychange", seen);
+  setInterval(seen, 5 * 60000);
 }
 
 /* ---------------- audit log (one document per month) ---------------- */

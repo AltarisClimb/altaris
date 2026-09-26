@@ -43,7 +43,8 @@ function fromProfile(p){
     createdAt: p.created_at ? Date.parse(p.created_at) : Date.now(),
     healthConsentAt: p.health_consent_at ? Date.parse(p.health_consent_at) : null,
     timezone: p.timezone || null,
-    lang: p.lang || null
+    lang: p.lang || null,
+    lastSeenAt: p.last_seen_at ? Date.parse(p.last_seen_at) : null
   };
 }
 
@@ -106,7 +107,7 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang");
+      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at");
     if (error) throw error;
     return data.map(fromProfile);
   },
@@ -162,14 +163,43 @@ const Remote = {
   /** Changements en direct (Realtime applique la même RLS).
    *  onDoc(col, id, row|null) pour athlete_docs, onMessage(row) pour chaque nouveau message. */
   watch(onDoc, onMessage){
-    this.client.removeAllChannels();
-    this.client.channel("live")
+    if (this._live) this.client.removeChannel(this._live);
+    this._live = this.client.channel("live")
       .on("postgres_changes", { event: "*", schema: "public", table: "athlete_docs" }, (p) => {
         if (p.eventType === "DELETE") onDoc(p.old.col, p.old.id, null);
         else onDoc(p.new.col, p.new.id, p.new);
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onMessage(p.new))
       .subscribe();
+  },
+
+  /* ---------- présence : qui a l'appli ouverte ----------
+     Un canal privé par grimpeur (presence:athlete:<id>) : le grimpeur, son coach
+     et les admins y sont autorisés (politiques sur realtime.messages). */
+  online: new Set(),
+  _presence: [],
+  startPresence(meId, athleteIds, onChange){
+    this._presence.forEach(ch => this.client.removeChannel(ch));
+    this._presence = [];
+    const recompute = () => {
+      const ids = new Set();
+      this._presence.forEach(ch => Object.keys(ch.presenceState()).forEach(k => { if (k !== meId) ids.add(k); }));
+      const changed = ids.size !== this.online.size || [...ids].some(id => !this.online.has(id));
+      this.online = ids;
+      if (changed && onChange) onChange();
+    };
+    [...new Set(athleteIds)].forEach(id => {
+      const ch = this.client.channel("presence:athlete:" + id, { config: { private: true, presence: { key: meId } } });
+      ch.on("presence", { event: "sync" }, recompute)
+        .subscribe(status => { if (status === "SUBSCRIBED") ch.track({ at: Date.now() }).catch(() => {}); });
+      this._presence.push(ch);
+    });
+  },
+  /** « Vu il y a… » : dernière activité, au plus une écriture par minute. */
+  async touchSeen(meId){
+    if (!this.client || !meId || Date.now() - (this._seenAt || 0) < 60000) return;
+    this._seenAt = Date.now();
+    await this.client.from("profiles").update({ last_seen_at: new Date().toISOString() }).eq("id", meId);
   },
 
   /* ---------- messagerie (tables messages, message_reads) ---------- */

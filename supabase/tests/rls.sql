@@ -203,6 +203,18 @@ insert into auth.users (id, email, raw_user_meta_data) values
 select t.ok('family name in capitals, spaces cleaned', (select full_name from profiles where email = 'd1@x') = 'Anne Marie LE GOFF');
 select t.ok('older sign-ups without first/last keep full_name', (select full_name from profiles where email = 'd2@x') = 'Old Style');
 
+-- ================= last seen
+select t.as(:S2); set role authenticated;
+select t.ok('S2 records own last activity', t.rows('update profiles set last_seen_at = now() where id = ' || quote_literal(:S2)) = 1);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('T1 (coach) sees S2 last activity', (select last_seen_at from profiles where id = :S2) is not null);
+select t.ok('T1 cannot write S2 last activity', t.rows('update profiles set last_seen_at = now() where id = ' || quote_literal(:S2)) = 0);
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('S1 cannot see S2 at all', (select count(*) from profiles where id = :S2) = 0);
+reset role;
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

@@ -12,7 +12,7 @@ import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { exercisePose, variantPose } from "../ui/poses.js";
 import { painLabel } from "./climber.js";
-import { View, isStaff } from "./shell.js";
+import { View, isStaff, presenceDot, presenceText } from "./shell.js";
 /* ================================================================
    15. EXERCISE BANK
    ================================================================ */
@@ -227,12 +227,13 @@ function viewMessages(me){
 
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ms.title")) + '</span>' +
-      '<h2>' + esc(other.name) + '</h2><p>' + esc(t("role."+other.role)) + '</p></div></div>' +
+      '<h2 class="pr-h">' + presenceDot(other) + esc(other.name) + '</h2><p>' + esc(t("role."+other.role)) +
+        (presenceText(other) ? ' · ' + esc(presenceText(other)) : '') + '</p></div></div>' +
     (partners.length > 1 ? '<div class="row tight noprint">' + partners.map(x => {
       const u = getThread(me.id, x.id);
       const n = (u.messages||[]).filter(m => m.from !== me.id && m.ts > ((u.read||{})[me.id]||0)).length;
       return '<button class="filt' + (x.id === other.id ? " on" : "") + '" data-act="thread" data-v="' + esc(x.id) + '">' +
-        esc(x.name) + (n ? '<span class="n">' + n + '</span>' : '') + '</button>';
+        presenceDot(x) + esc(x.name) + (n ? '<span class="n">' + n + '</span>' : '') + '</button>';
     }).join("") + '</div>' : '') +
 
     '<div class="panel pad stack">' +

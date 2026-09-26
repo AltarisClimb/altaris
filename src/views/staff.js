@@ -11,7 +11,7 @@ import { ic } from "../ui/icons.js";
 import { activePain, kpi, painLabel, sessionsOf, viewCalendar } from "./climber.js";
 import { getThread } from "./library.js";
 import { INJURY_SITES } from "./onboarding.js";
-import { View, initials, isStaff } from "./shell.js";
+import { View, initials, isOnline, isStaff, presenceDot } from "./shell.js";
 import { duration } from "./today.js";
 /* ================================================================
    18. COACH COMMAND CENTER
@@ -47,11 +47,11 @@ function viewFleet(me){
         const mine = sessionsOf(c.id), wk = weekProgress(mine);
         const last = mine.filter(s => s.status === "done").pop();
         return '<button class="fl-card ' + status + '" data-act="athlete" data-v="' + esc(c.id) + '">' +
-          '<span class="fl-head"><span class="avatar">' + esc(initials(c.name)) + '</span>' +
+          '<span class="fl-head"><span class="av-wrap"><span class="avatar">' + esc(initials(c.name)) + '</span>' + presenceDot(c) + '</span>' +
             '<span class="fl-name"><b>' + esc(c.name) + '</b>' +
               '<span class="dim tiny">' + esc(p.gradeSport || "—") + ' / ' + esc(p.gradeBoulder || "—") + '</span></span>' +
             '<span class="fl-dot ' + status + '" title="' + esc(t("fl." + status)) + '"></span></span>' +
-          '<span class="fl-line">' + esc(t("fl.week", { done: wk.done, total: wk.total })) + ' · ' +
+          '<span class="fl-line">' + (isOnline(c) ? '<b class="pr-on">' + esc(t("pr.online")) + '</b> · ' : '') + esc(t("fl.week", { done: wk.done, total: wk.total })) + ' · ' +
             esc(last ? t("fl.lastDone", { when: relDays(last.date) }) : t("fl.noneDone")) + '</span>' +
           '<span class="fl-spark">' + sparkline(loadSeries(c.id, 28)) + '</span>' +
           '<span class="fl-alerts">' + (al.length

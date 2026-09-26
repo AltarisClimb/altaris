@@ -612,3 +612,14 @@ main > *{animation:fade-up .22s ease both}
 @keyframes sk{from{background-position:100% 0} to{background-position:-100% 0}}
 .toast{cursor:pointer}
 @media (prefers-reduced-motion:reduce){ main > *{animation:none} .sk i{animation:none} }
+
+/* ---------- présence (en ligne / vu il y a…) ---------- */
+.pr-dot{display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--ink-3); opacity:.5; flex:none;
+  margin-right:6px; vertical-align:middle}
+.pr-dot.on{background:var(--good); opacity:1; box-shadow:0 0 0 3px var(--good-wash)}
+.pr-h{display:flex; align-items:center}
+.pr-h .pr-dot{width:11px; height:11px; margin-right:9px}
+.av-wrap{position:relative; display:inline-flex; flex:none}
+.av-wrap .pr-dot{position:absolute; right:-1px; bottom:-1px; margin:0; width:12px; height:12px; box-shadow:0 0 0 2px var(--surface)}
+.av-wrap .pr-dot:not(.on){display:none}
+.pr-on{color:var(--good); font-weight:600}

@@ -1,6 +1,6 @@
 import { APP_VERSION, COPYRIGHT, diffDays, esc, today, weekStart } from "../core.js";
 import { Access, Session, Store } from "../data.js";
-import { t } from "../i18n/index.js";
+import { relTime, t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
 import { logo } from "../ui/brand.js";
 import { ic } from "../ui/icons.js";
@@ -44,6 +44,20 @@ const HIDDEN_TABS = ["profile", "tests", "exercises"];
 
 /** Coach ou admin : tout ce qui relève de l'encadrement. */
 function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
+
+/** Présence d'une personne : en ligne (appli ouverte), sinon « vu il y a… » (mode Supabase). */
+function isOnline(u){ return !!u && Remote.online.has(u.id); }
+function presenceText(u){
+  if (!Remote.client || !u) return "";
+  if (isOnline(u)) return t("pr.online");
+  return u.lastSeenAt ? t("pr.seen", { when: relTime(u.lastSeenAt) }) : t("pr.never");
+}
+/** Pastille verte (en ligne) ou grise (hors ligne) ; rien en mode local. */
+function presenceDot(u){
+  if (!Remote.client || !u) return "";
+  const on = isOnline(u);
+  return '<span class="pr-dot' + (on ? " on" : "") + '" title="' + esc(presenceText(u)) + '" aria-label="' + esc(presenceText(u)) + '"></span>';
+}
 
 function tabBadge(id){
   const me = Session.live(); if (!me) return 0;
@@ -111,4 +125,4 @@ function watermark(){
   return '<div class="wmark" aria-hidden="true">' + s + '</div>';
 }
 
-export { HIDDEN_TABS, TABS, View, initials, isStaff, legalFooter, tabBadge, tabsBar, topbar, watermark };
+export { HIDDEN_TABS, TABS, View, initials, isOnline, isStaff, legalFooter, presenceDot, presenceText, tabBadge, tabsBar, topbar, watermark };
