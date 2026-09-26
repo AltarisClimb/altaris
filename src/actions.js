@@ -63,6 +63,9 @@ const ACTIONS = {
   "acwr-m": (v) => { View.acwrMethod = v; render(); },
   week: (v) => { View.weekOf = v === "0" ? weekStart(today()) : addDays(View.weekOf, Number(v) * 7); render(); },
   athlete: (v) => { View.athlete = v || null; window.scrollTo(0,0); render(); },
+  /* Depuis « À traiter » : ouvrir la fiche du grimpeur dans l'onglet Athlètes. */
+  "athlete-go": (v) => { View.tab = "athletes"; View.athlete = v || null; window.scrollTo(0,0); render(); },
+  "admin-tab": (v) => { View.adminTab = v; window.scrollTo(0,0); render(); },
   "cal-for": (v) => { View.calFor = v; render(); },
   "plan-athlete": (v) => { View.calFor = v; View.tab = "planning"; View.athlete = null; window.scrollTo(0,0); render(); },
   thread: (v) => { View.thread = v; render(); },

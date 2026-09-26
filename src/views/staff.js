@@ -7,7 +7,8 @@ import { LI, fmtDate, fmtNum, fmtTime, relDays, t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
 import { acwrSeries, progressLines, radarChart, sparkline, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
-import { kpi, painLabel, sessionsOf, viewCalendar } from "./climber.js";
+import { activePain, kpi, painLabel, sessionsOf, viewCalendar } from "./climber.js";
+import { getThread } from "./library.js";
 import { INJURY_SITES } from "./onboarding.js";
 import { View, initials, isStaff } from "./shell.js";
 /* ================================================================
@@ -272,4 +273,89 @@ function viewAudit(){
   '</div>';
 }
 
-export { viewAccounts, viewAthleteFile, viewAudit, viewFleet, viewPairings, viewParams, viewPlanning };
+
+/* ================================================================
+   18b. À TRAITER — ce qui attend une action du coach, en une liste
+   ================================================================ */
+const SEV_ORDER = { crit: 0, msg: 1, warn: 2, info: 3 };
+
+/** Éléments à traiter pour l'encadrant : messages, douleurs, séances à valider,
+ *  charge hors zone, grimpeurs sans programme, bilans à refaire. */
+function inboxItems(me){
+  const cfg = config();
+  const out = [];
+  for (const c of Access.climbers()){
+    const th = getThread(me.id, c.id);
+    const lastRead = (th.read || {})[me.id] || 0;
+    const unread = (th.messages || []).filter(m => m.from !== me.id && m.ts > lastRead).length;
+    if (unread) out.push({ sev: "msg", c, icon: "chat", text: t("in.unread", { n: unread }), act: "thread-go", btn: t("in.reply") });
+
+    for (const p of activePain(c.id)){
+      out.push({ sev: (p.eva || 0) >= cfg.painAlert ? "crit" : "warn", c, icon: "pain",
+        text: t("in.pain", { site: painLabel(p.location), eva: p.eva || 0 }), act: "athlete-go", btn: t("in.open") });
+    }
+
+    const mine = sessionsOf(c.id);
+    const late = mine.filter(s => s.status === "planned" && diffDays(today(), s.date) > 0 && diffDays(today(), s.date) <= 14).length;
+    if (late) out.push({ sev: "warn", c, icon: "check", text: t("in.toValidate", { n: late }), act: "thread-go", btn: t("in.nudge") });
+
+    const acwr = alertsFor(c.id).find(a => a.k === "co.alertAcwr");
+    if (acwr) out.push({ sev: acwr.sev, c, icon: "trend", text: t("in.load", { d: acwr.d }), act: "athlete-go", btn: t("in.open") });
+
+    const soon = mine.some(s => s.status === "planned" && diffDays(s.date, today()) >= 0 && diffDays(s.date, today()) <= 7);
+    if (!soon) out.push({ sev: "info", c, icon: "cal", text: t("in.noPlan"), act: "plan-athlete", btn: t("in.plan") });
+
+    const la = latestAssessment(c.id);
+    if (!la || diffDays(today(), la.date) > cfg.testValidityDays)
+      out.push({ sev: "info", c, icon: "test", text: la ? t("in.testOld") : t("in.noTest"), act: "athlete-go", btn: t("in.open") });
+  }
+  return out.sort((a, b) => SEV_ORDER[a.sev] - SEV_ORDER[b.sev] || a.c.name.localeCompare(b.c.name));
+}
+
+/** Pastille de l'onglet : ce qui est urgent (tout sauf l'informatif). */
+function inboxCount(me){ return inboxItems(me).filter(x => x.sev !== "info").length; }
+
+function viewInbox(me){
+  const items = inboxItems(me);
+  const urgent = items.filter(x => x.sev !== "info");
+  const later = items.filter(x => x.sev === "info");
+  const row = (x) =>
+    '<div class="in-row ' + x.sev + '">' +
+      '<span class="in-ic">' + ic(x.icon) + '</span>' +
+      '<span class="in-main"><span class="in-who">' + esc(x.c.name) + '</span>' +
+        '<span class="in-what">' + esc(x.text) + '</span></span>' +
+      '<button class="btn sm' + (x.sev === "info" ? ' ghost' : '') + '" data-act="' + x.act + '" data-v="' + esc(x.c.id) + '">' + esc(x.btn) + '</button>' +
+    '</div>';
+
+  return '<div class="stack lg">' +
+    '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("in.eyebrow")) + '</span>' +
+      '<h2>' + esc(t("in.title")) + '</h2>' +
+      '<p>' + esc(urgent.length ? t("in.summary", { n: urgent.length }) : t("in.allClear")) + '</p></div></div>' +
+
+    (!Access.climbers().length
+      ? '<div class="panel"><div class="empty">' + ic("users") + '<div class="t">' + esc(t("co.noAthletes")) + '</div>' +
+        '<div class="d">' + esc(t("co.noAthletesD")) + '</div></div></div>'
+      : (urgent.length ? '<div class="panel in-list">' + urgent.map(row).join("") + '</div>'
+         : '<div class="panel"><div class="empty">' + ic("check") + '<div class="t">' + esc(t("in.allClear")) + '</div>' +
+           '<div class="d">' + esc(t("in.allClearD")) + '</div></div></div>') +
+        (later.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("in.later")) + '</span>' +
+          '<div class="panel in-list">' + later.map(row).join("") + '</div></div>' : '')) +
+  '</div>';
+}
+
+/* ================================================================
+   18c. ADMIN — comptes, duos, paramètres, audit sous un seul onglet
+   ================================================================ */
+const ADMIN_TABS = [["accounts", "nav.accounts"], ["pairings", "nav.pairings"], ["params", "nav.params"], ["audit", "nav.audit"]];
+function viewAdmin(){
+  const cur = ADMIN_TABS.some(x => x[0] === View.adminTab) ? View.adminTab : "accounts";
+  const inner = cur === "pairings" ? viewPairings() : cur === "params" ? viewParams() : cur === "audit" ? viewAudit() : viewAccounts();
+  return '<div class="stack lg">' +
+    '<div class="seg noprint" role="tablist">' + ADMIN_TABS.map(([id, key]) =>
+      '<button role="tab" aria-selected="' + (cur === id) + '" class="' + (cur === id ? "on" : "") + '" data-act="admin-tab" data-v="' + id + '">' +
+        esc(t(key)) + '</button>').join("") + '</div>' +
+    inner +
+  '</div>';
+}
+
+export { inboxCount, inboxItems, viewAccounts, viewAdmin, viewAthleteFile, viewAudit, viewFleet, viewInbox, viewPairings, viewParams, viewPlanning };

@@ -466,3 +466,19 @@ button.excard:hover{border-color:var(--accent-line); transform:translateY(-1px)}
   .printonly{display:block!important}
 }
 .printonly{display:none}
+
+/* « À traiter » (coach / admin) */
+.in-list{padding:4px 0}
+.in-row{display:flex; align-items:center; gap:12px; padding:11px 14px; border-top:1px solid var(--line-soft)}
+.in-row:first-child{border-top:none}
+.in-ic{width:32px; height:32px; border-radius:50%; display:grid; place-items:center; flex:none;
+  background:var(--surface-2); color:var(--ink-2)}
+.in-ic svg{width:16px; height:16px}
+.in-row.crit .in-ic{background:var(--crit-wash); color:var(--crit)}
+.in-row.warn .in-ic{background:var(--warn-wash); color:var(--warn)}
+.in-row.msg .in-ic{background:var(--accent-wash); color:var(--accent)}
+.in-main{display:flex; flex-direction:column; gap:2px; flex:1 1 auto; min-width:0}
+.in-who{font-weight:600; font-size:14px}
+.in-what{font-size:12.5px; color:var(--ink-2)}
+.in-row .btn{flex:none}
+@media (max-width:480px){ .in-row{flex-wrap:wrap} .in-row .btn{margin-left:44px} }

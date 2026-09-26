@@ -1,11 +1,11 @@
-import { APP_VERSION, COPYRIGHT, diffDays, esc, sum, today, weekStart } from "../core.js";
+import { APP_VERSION, COPYRIGHT, diffDays, esc, today, weekStart } from "../core.js";
 import { Access, Session, Store } from "../data.js";
-import { alertsFor } from "../domain/workload.js";
 import { t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
 import { logo } from "../ui/brand.js";
 import { ic } from "../ui/icons.js";
 import { unreadCount } from "./library.js";
+import { inboxCount } from "./staff.js";
 /* ================================================================
    9. VIEW STATE & SHELL
    ================================================================ */
@@ -28,14 +28,16 @@ if (View.theme) document.documentElement.setAttribute("data-theme", View.theme);
 const TABS = {
   climber: [["overview","nav.overview","home"],["calendar","nav.calendar","cal"],["tests","nav.tests","test"],
             ["exercises","nav.exercises","book"],["messages","nav.messages","chat"],["profile","nav.profile","user"]],
-  coach:   [["athletes","nav.athletes","users"],["planning","nav.planning","cal"],["exercises","nav.exercises","book"],
-            ["messages","nav.messages","chat"],["profile","nav.profile","user"]],
-  /* L'admin est un coach avec des super-pouvoirs : tous les onglets coach
-     (sur tous les grimpeurs), plus la gestion de la plateforme. */
-  admin:   [["athletes","nav.athletes","users"],["planning","nav.planning","cal"],["exercises","nav.exercises","book"],
-            ["messages","nav.messages","chat"],["accounts","nav.accounts","user"],["pairings","nav.pairings","shield"],
-            ["params","nav.params","gear"],["audit","nav.audit","list"],["profile","nav.profile","user"]]
+  /* Encadrants : « À traiter » d'abord ; le profil s'ouvre depuis l'avatar en haut à droite. */
+  coach:   [["inbox","nav.inbox","alert"],["athletes","nav.athletes","users"],["planning","nav.planning","cal"],
+            ["exercises","nav.exercises","book"],["messages","nav.messages","chat"]],
+  /* L'admin est un coach avec des super-pouvoirs : les onglets coach (sur tous
+     les grimpeurs), plus un onglet Admin (comptes, duos, paramètres, audit). */
+  admin:   [["inbox","nav.inbox","alert"],["athletes","nav.athletes","users"],["planning","nav.planning","cal"],
+            ["exercises","nav.exercises","book"],["messages","nav.messages","chat"],["admin","nav.admin","shield"]]
 };
+/** Onglets ouverts sans figurer dans la barre (le profil, via l'avatar). */
+const HIDDEN_TABS = ["profile"];
 
 /** Coach ou admin : tout ce qui relève de l'encadrement. */
 function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
@@ -47,7 +49,7 @@ function tabBadge(id){
     if (id === "messages") return unreadCount(me.id);
   }
   if (isStaff(me)){
-    if (id === "athletes") return sum(Access.climbers().map(c => alertsFor(c.id).filter(a => a.sev === "crit").length));
+    if (id === "inbox") return inboxCount(me);
     if (id === "messages") return unreadCount(me.id);
   }
   return 0;
@@ -62,10 +64,11 @@ function topbar(){
     '<span class="spacer"></span>' +
     '<button class="btn icon sm ghost" data-act="theme" aria-label="' + esc(t("g.theme")) + '" title="' + esc(t("g.theme")) + '">' +
       ic(View.theme === "light" ? "moon" : "sun") + '</button>' +
-    (me ? '<button class="btn sm ghost" data-act="signout" title="' + esc(t("g.signOut")) + '">' +
+    /* L'avatar ouvre le profil (la déconnexion s'y trouve). */
+    (me ? '<button class="btn sm ghost" data-act="tab" data-v="profile" title="' + esc(t("nav.profile")) + '">' +
       '<span class="avatar sm">' + esc(initials(me.name)) + '</span>' +
       '<span class="tiny nowrap role-lb" style="max-width:110px;overflow:hidden;text-overflow:ellipsis">' + esc(t("role."+me.role)) + '</span>' +
-      ic("out") + '</button>' : "") +
+      '</button>' : "") +
   '</div>';
 }
 const initials = (n) => String(n||"?").trim().split(/\s+/).map(w => w[0]).slice(0,2).join("");
@@ -105,4 +108,4 @@ function watermark(){
   return '<div class="wmark" aria-hidden="true">' + s + '</div>';
 }
 
-export { TABS, View, initials, isStaff, legalFooter, tabBadge, tabsBar, topbar, watermark };
+export { HIDDEN_TABS, TABS, View, initials, isStaff, legalFooter, tabBadge, tabsBar, topbar, watermark };

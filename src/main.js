@@ -9,8 +9,8 @@ import { viewAuth, viewSetPassword } from "./views/auth.js";
 import { viewCalendar, viewOverview } from "./views/climber.js";
 import { viewExercises, viewMessages, viewProfile } from "./views/library.js";
 import { viewOnboarding } from "./views/onboarding.js";
-import { TABS, View, legalFooter, tabsBar, topbar, watermark } from "./views/shell.js";
-import { viewAccounts, viewAthleteFile, viewAudit, viewFleet, viewPairings, viewParams, viewPlanning } from "./views/staff.js";
+import { HIDDEN_TABS, TABS, View, legalFooter, tabsBar, topbar, watermark } from "./views/shell.js";
+import { viewAdmin, viewAthleteFile, viewFleet, viewInbox, viewPlanning } from "./views/staff.js";
 import { bindTimer, updateLiveMetric, viewTests } from "./views/testing.js";
 /* Import à effet de bord : actions.js n'exporte rien que main utilise,
    mais il enregistre tous les écouteurs d'événements de l'application.
@@ -33,7 +33,7 @@ function body(){
     View.onb = { step:0, data: Object.assign({ sex:"x", discipline:"both", injuries:[], availability:[], goals:[] }, me.profile||{}) };
     return viewOnboarding();
   }
-  if (!View.tab || !(TABS[me.role]||[]).some(x => x[0] === View.tab)) View.tab = TABS[me.role][0][0];
+  if (!View.tab || !((TABS[me.role]||[]).some(x => x[0] === View.tab) || HIDDEN_TABS.includes(View.tab))) View.tab = TABS[me.role][0][0];
   let inner = "";
   switch (View.tab){
     case "overview":  inner = viewOverview(me); break;
@@ -44,10 +44,8 @@ function body(){
     case "profile":   inner = viewProfile(me); break;
     case "athletes":  inner = View.athlete ? viewAthleteFile(me) : viewFleet(me); break;
     case "planning":  inner = viewPlanning(me); break;
-    case "accounts":  inner = viewAccounts(); break;
-    case "pairings":  inner = viewPairings(); break;
-    case "params":    inner = viewParams(); break;
-    case "audit":     inner = viewAudit(); break;
+    case "inbox":     inner = viewInbox(me); break;
+    case "admin":     inner = viewAdmin(); break;
     default:          inner = viewOverview(me);
   }
   return tabsBar() + '<main>' + inner + '</main>';
