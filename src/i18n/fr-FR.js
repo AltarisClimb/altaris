@@ -76,6 +76,8 @@ export default {
   "auth.noAccountsD": "Créez le premier compte pour démarrer. Le premier compte créé reçoit le rôle Administrateur.",
   "auth.newTitle": "Nouveau compte",
   "auth.fullName": "Nom complet",
+  "auth.firstName": "Prénom",
+  "auth.lastName": "Nom",
   "auth.email": "E-mail",
   "auth.choosePin": "Choisir un code à 4 chiffres",
   "auth.roleSel": "Rôle demandé",

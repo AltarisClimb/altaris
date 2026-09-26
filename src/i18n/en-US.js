@@ -76,6 +76,8 @@ export default {
   "auth.noAccountsD": "Create the first account to get started. The first account created receives the Administrator role.",
   "auth.newTitle": "New account",
   "auth.fullName": "Full name",
+  "auth.firstName": "First name",
+  "auth.lastName": "Last name",
   "auth.email": "Email",
   "auth.choosePin": "Choose a 4-digit code",
   "auth.roleSel": "Requested role",

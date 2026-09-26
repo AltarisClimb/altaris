@@ -196,6 +196,13 @@ select t.ok('T1 cannot see S2 calendar token', (select count(*) from calendar_to
 select t.ok('T1 cannot read the notification log', (select count(*) from notification_log) = 0);
 reset role;
 
+-- ================= names at sign-up (as postgres, like the auth service)
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000d1', 'd1@x', '{"first_name":"  Anne  Marie ","last_name":"le   goff"}'),
+  ('00000000-0000-0000-0000-0000000000d2', 'd2@x', '{"full_name":"Old Style"}');
+select t.ok('family name in capitals, spaces cleaned', (select full_name from profiles where email = 'd1@x') = 'Anne Marie LE GOFF');
+select t.ok('older sign-ups without first/last keep full_name', (select full_name from profiles where email = 'd2@x') = 'Old Style');
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

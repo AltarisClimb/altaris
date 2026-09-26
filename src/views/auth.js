@@ -1,4 +1,4 @@
-import { $, esc, uid } from "../core.js";
+import { $, esc, personName, uid } from "../core.js";
 import { Session, Store, audit } from "../data.js";
 import { t } from "../i18n/index.js";
 import { body, loadExercises, render } from "../main.js";
@@ -86,7 +86,11 @@ function remoteSignUpModal(){
   Modal.open({
     title: t("auth.newTitle"),
     body: '<div class="stack">' +
-      '<label class="f"><span class="lb">' + esc(t("auth.fullName")) + '</span><input class="inp" id="na-name" autocomplete="name"></label>' +
+      /* Prénom et nom séparés : le nom de famille est enregistré en majuscules. */
+      '<div class="grid g2">' +
+        '<label class="f"><span class="lb">' + esc(t("auth.firstName")) + '</span><input class="inp" id="na-first" autocomplete="given-name"></label>' +
+        '<label class="f"><span class="lb">' + esc(t("auth.lastName")) + '</span><input class="inp" id="na-last" autocomplete="family-name" style="text-transform:uppercase"></label>' +
+      '</div>' +
       '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span><input class="inp" id="na-mail" type="email" autocomplete="email"></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
         pwField("na-pass", ' type="password" autocomplete="new-password"') +
@@ -98,13 +102,14 @@ function remoteSignUpModal(){
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       $("#na-ok", root).onclick = async () => {
-        const name = $("#na-name", root).value.trim();
+        const first = $("#na-first", root).value, last = $("#na-last", root).value;
+        const name = first.trim() && last.trim() ? personName(first, last) : "";
         const mail = $("#na-mail", root).value.trim();
         const pass = $("#na-pass", root).value;
         if (!name || !mail || !pass) return authError(root, t("er.required"));
         if (pass.length < 8) return authError(root, t("auth.passwordHint"));
         let signedIn;
-        try{ signedIn = await Remote.signUp(mail, pass, name); }
+        try{ signedIn = await Remote.signUp(mail, pass, { first: personName(first, ""), last: personName("", last), full: name }); }
         catch(e){ return authError(root, authMessage(e)); }
         Modal.close();
         if (!signedIn){ toast(t("auth.confirmSent"), "good"); return; }
@@ -206,7 +211,11 @@ function newAccountModal(){
   Modal.open({
     title: t("auth.newTitle"),
     body: '<div class="stack">' +
-      '<label class="f"><span class="lb">' + esc(t("auth.fullName")) + '</span><input class="inp" id="na-name" autocomplete="name"></label>' +
+      /* Prénom et nom séparés : le nom de famille est enregistré en majuscules. */
+      '<div class="grid g2">' +
+        '<label class="f"><span class="lb">' + esc(t("auth.firstName")) + '</span><input class="inp" id="na-first" autocomplete="given-name"></label>' +
+        '<label class="f"><span class="lb">' + esc(t("auth.lastName")) + '</span><input class="inp" id="na-last" autocomplete="family-name" style="text-transform:uppercase"></label>' +
+      '</div>' +
       '<label class="f"><span class="lb">' + esc(t("auth.email")) + ' <span class="dim">(' + esc(t("g.optional")) + ')</span></span>' +
         '<input class="inp" id="na-mail" type="email" autocomplete="email"></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.choosePin")) + '</span>' +
@@ -222,7 +231,8 @@ function newAccountModal(){
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       $("#na-ok", root).onclick = async () => {
-        const name = $("#na-name", root).value.trim();
+        const first = $("#na-first", root).value, last = $("#na-last", root).value;
+        const name = first.trim() && last.trim() ? personName(first, last) : "";
         const pin  = $("#na-pin", root).value.trim();
         const err  = (m) => { const e = $("#na-err", root); e.style.display = "flex"; $("span", e).textContent = m; };
         if (!name) return err(t("er.required"));

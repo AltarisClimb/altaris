@@ -279,10 +279,12 @@ const Remote = {
   },
 
   /** Renvoie true si une session est ouverte, false si l'e-mail doit être confirmé. */
-  async signUp(email, password, fullName){
+  /** names = { first, last, full } ; le serveur recompose « Prénom NOM » à partir de first/last. */
+  async signUp(email, password, names){
     const { data, error } = await this.client.auth.signUp({
       email, password,
-      options: { data: { full_name: fullName }, emailRedirectTo: location.origin + location.pathname }
+      options: { data: { first_name: names.first, last_name: names.last, full_name: names.full },
+                 emailRedirectTo: location.origin + location.pathname }
     });
     if (error) throw error;
     return !!data.session;
