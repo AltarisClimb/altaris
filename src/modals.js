@@ -115,6 +115,7 @@ function rpeModal(id){
           feedback: $("#rpe-fb", root).value.trim(), doneExercises: done, doneAt: Date.now()
         }));
         audit("session_validated", s.id + " RPE" + rpe + " " + d + "min");
+        Remote.notify({ kind: "done", athleteId: s.userId, sessionId: s.id });
         Modal.close();
         toast(t("rpe.validated"), "good");
       };
@@ -441,6 +442,42 @@ function videoCheckModal(){
   });
 }
 
+/* ---------------- « Bravo » du coach sur une séance validée ----------------
+   Enregistré sur la séance (le grimpeur le voit dans son programme) et envoyé
+   comme message (il est notifié). */
+const KUDOS = [["👏", "kd.clap"], ["💪", "kd.strong"], ["🔥", "kd.fire"]];
+function kudosModal(sessionId){
+  const s = Store.get("sessions", sessionId); if (!s) return;
+  const me = Session.live(), who = Store.get("users", s.userId) || {};
+  let emoji = KUDOS[0][0];
+  Modal.open({
+    title: t("kd.title", { name: (who.name || "").split(" ")[0] }),
+    body: '<div class="stack">' +
+      '<p class="small muted">' + esc(s.title) + (s.rpe ? ' · ' + esc(t("pl.effort")) + ' ' + s.rpe + '/10' : '') + '</p>' +
+      '<div class="kd-row">' + KUDOS.map(([e, k], i) =>
+        '<button class="kd' + (i === 0 ? ' on' : '') + '" data-kd="' + e + '"><span>' + e + '</span>' + esc(t(k)) + '</button>').join("") + '</div>' +
+      '<label class="f"><span class="lb">' + esc(t("kd.word")) + ' <span class="dim">(' + esc(t("g.optional")) + ')</span></span>' +
+        '<input class="inp" id="kd-text" maxlength="300" placeholder="' + esc(t("kd.wordPh")) + '"></label>' +
+    '</div>',
+    footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button>' +
+            '<button class="btn pri" id="kd-ok">' + ic("send") + esc(t("kd.send")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      $$("[data-kd]", root).forEach(b => b.onclick = () => {
+        emoji = b.dataset.kd;
+        $$("[data-kd]", root).forEach(x => x.classList.toggle("on", x === b));
+      });
+      $("#kd-ok", root).onclick = async () => {
+        const word = $("#kd-text", root).value.trim();
+        if (!await Store.put("sessions", s.id, Object.assign({}, s, { kudos: { by: me.id, name: me.name, emoji, at: Date.now() } }))) return;
+        await sendMessage(me.id, s.userId, { ctx: t("kd.ctx", { title: s.title }), text: emoji + (word ? " " + word : "") });
+        audit("kudos", s.id);
+        Modal.close(); toast(t("kd.sent"), "good");
+      };
+    }
+  });
+}
+
 /* ---------------- abonnement d'agenda (flux webcal privé) ----------------
    Le lien est créé à la demande ; l'agenda du téléphone le relit tout seul. */
 async function calendarSubscribeModal(){
@@ -512,4 +549,4 @@ function withHealthConsent(action){
   healthConsentModal(() => action());
 }
 
-export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };
+export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

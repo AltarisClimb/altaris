@@ -10,6 +10,7 @@ import { LI, fmtDate, fmtNum, relDays, t } from "../i18n/index.js";
 import { acwrGauge, acwrSeries, radarChart, typeBars, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
 import { DAYS } from "./onboarding.js";
+import { progressPanel } from "./progress.js";
 import { View } from "./shell.js";
 /* ================================================================
    12. CLIMBER — overview
@@ -56,6 +57,9 @@ function viewOverview(user){
       '<div class="row tight noprint">' +
         '<button class="btn sm" data-act="pain-new">' + ic("pain") + esc(t("ov.reportPain")) + '</button>' +
         '<button class="btn sm ghost" data-act="print">' + ic("print") + esc(t("g.print")) + '</button></div></div>' +
+
+    /* progrès en clair et badges, avant les chiffres techniques */
+    progressPanel(u) +
 
     /* alerts */
     (pains.length ? '<div class="notice ' + (Math.max(...pains.map(x=>x.eva)) >= cfg.painAlert ? "crit" : "warn") + '">' + ic("alert") +
@@ -318,6 +322,7 @@ function agenda(u){
             '<span class="ag-main"><span class="ag-t">' + esc(s.title) + '</span>' +
               '<span class="ag-m">' + esc(t("st." + s.type)) + (s.type === "rest" ? '' : ' · ' + esc(fmtDuration(s.status === "done" ? s.actualMin : s.plannedMin)) +
                 ' · ' + esc(t("cal.intensity", { n: s.targetIntensity || 5 }))) + '</span></span>' +
+            (s.kudos ? '<span class="chip acc" title="' + esc(t("kd.from", { name: s.kudos.name })) + '">' + esc(s.kudos.emoji) + '</span>' : '') +
             '<span class="chip ' + st[1] + '">' + esc(st[0]) + '</span>' + ic("chevR", "chev") +
           '</button>';
         }).join("")

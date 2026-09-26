@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
@@ -60,6 +60,7 @@ const ACTIONS = {
   },
   "play-message": () => { stopPlayer(); View.tab = "messages"; render(); },
   "cal-subscribe": () => calendarSubscribeModal(),
+  kudos: (v) => kudosModal(v),
   /* Notifications : l'autorisation est demandée ici, suite à un geste de l'utilisateur (exigé par iOS). */
   "push-on": async () => {
     try{ await Remote.enablePush(); toast(t("nt.enabled"), "good"); }

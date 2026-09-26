@@ -1,4 +1,4 @@
-// POST /functions/v1/notify  { kind: "message" | "session", athleteId, sessionId?, update? }
+// POST /functions/v1/notify  { kind: "message" | "session" | "done", athleteId, sessionId?, update? }
 // Called by the app right after a message is sent or a session is saved. The caller's
 // own token proves who they are; the database decides whether they may reach that climber.
 // Content is read from the database, never taken from the request.
@@ -23,7 +23,7 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: "auth" }, 401);
 
   const { kind, athleteId, sessionId, update } = await req.json().catch(() => ({}));
-  if (!athleteId || !["message", "session"].includes(kind)) return json({ error: "input" }, 400);
+  if (!athleteId || !["message", "session", "done"].includes(kind)) return json({ error: "input" }, 400);
   const { data: allowed } = await caller.rpc("can_access_athlete", { athlete: athleteId });
   if (!allowed) return json({ error: "forbidden" }, 403);
 
@@ -43,6 +43,19 @@ Deno.serve(async (req) => {
     if (!last) return json({ sent: 0 });
     const body = last.body.length > 140 ? last.body.slice(0, 137) + "…" : last.body;
     return json({ sent: await pushTo(admin, toIds, { title: T.message(fromName), body, url: SITE + "/?tab=messages", tag: "msg-" + athleteId }) });
+  }
+
+  // kind === "done": the climber finished a session; their coach hears about it.
+  if (kind === "done"){
+    if (user.id !== athleteId || !sessionId) return json({ sent: 0 });
+    const { data: doc } = await admin.from("athlete_docs").select("data").eq("col", "sessions").eq("id", sessionId)
+      .eq("athlete_id", athleteId).maybeSingle();
+    const d = doc?.data as { title: string; status: string; rpe?: number } | undefined;
+    if (!d || d.status !== "done") return json({ sent: 0 });
+    return json({ sent: await pushTo(admin, toIds, {
+      title: T.done(fromName), body: d.title + (d.rpe ? " · " + T.effort(d.rpe) : ""),
+      url: SITE + "/?tab=inbox", tag: "done-" + sessionId,
+    }) });
   }
 
   // kind === "session": only staff plan sessions for a climber.

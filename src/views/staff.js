@@ -2,6 +2,7 @@ import { byId, diffDays, esc, iso, sum, today } from "../core.js";
 import { Access, Store, config } from "../data.js";
 import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, fontLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, latestAssessment, limiters } from "../domain/scoring.js";
+import { weekProgress } from "../domain/progress.js";
 import { acwrZone, alertsFor, computeACWR, loadSeries, monotonyStrain } from "../domain/workload.js";
 import { LI, fmtDate, fmtNum, fmtTime, relDays, t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
@@ -11,6 +12,7 @@ import { activePain, kpi, painLabel, sessionsOf, viewCalendar } from "./climber.
 import { getThread } from "./library.js";
 import { INJURY_SITES } from "./onboarding.js";
 import { View, initials, isStaff } from "./shell.js";
+import { duration } from "./today.js";
 /* ================================================================
    18. COACH COMMAND CENTER
    ================================================================ */
@@ -36,26 +38,28 @@ function viewFleet(me){
       kpi(t("ts.title"), String(list.filter(c => latestAssessment(c.id)).length) + " / " + list.length, "", t("ts.history")) +
     '</div>' +
 
-    (list.length ? '<div class="panel"><div class="tw"><table class="dt" style="min-width:760px"><thead><tr>' +
-      '<th>' + esc(t("g.name")) + '</th><th>' + esc(t("pf.level")) + '</th>' +
-      '<th class="n">' + esc(t("ov.acwr")) + '</th><th>' + esc(t("ov.weekLoad")) + '</th>' +
-      '<th class="n">' + esc(t("ov.lastTest")) + '</th><th>' + esc(t("co.alerts")) + '</th><th></th></tr></thead><tbody>' +
-      withAlerts.map(({ c, al, a }) => {
-        const p = c.profile || {}, z = acwrZone(a.ratio), la = latestAssessment(c.id);
-        return '<tr>' +
-          '<td><span class="row tight nowrap"><span class="avatar sm">' + esc(initials(c.name)) + '</span>' +
-            '<span><span style="font-weight:600;display:block">' + esc(c.name) + '</span>' +
-            '<span class="dim tiny">' + esc(t("co.lastActive")) + ' ' + esc(p.lastActive ? relDays(iso(new Date(p.lastActive))) : t("g.never")) + '</span></span></span></td>' +
-          '<td><span class="chip">' + esc(p.gradeSport || "—") + ' / ' + esc(p.gradeBoulder || "—") + '</span></td>' +
-          '<td class="n">' + (a.ratio == null ? '<span class="dim">—</span>' :
-            '<span class="chip ' + z.cls + '">' + a.ratio.toFixed(2) + '</span>') + '</td>' +
-          '<td>' + sparkline(loadSeries(c.id, 28)) + '</td>' +
-          '<td class="n">' + (la ? esc(relDays(la.date)) : '<span class="dim">—</span>') + '</td>' +
-          '<td>' + (al.length ? al.slice(0,2).map(x => '<span class="chip ' + x.sev + '">' + esc(t(x.k)) + '</span>').join(" ") +
-            (al.length > 2 ? ' <span class="chip">+' + (al.length-2) + '</span>' : '') : '<span class="dim tiny">' + esc(t("co.noAlerts")) + '</span>') + '</td>' +
-          '<td class="n noprint"><button class="btn xs" data-act="athlete" data-v="' + esc(c.id) + '">' + esc(t("co.openFile")) + ic("chevR") + '</button></td>' +
-        '</tr>';
-      }).join("") + '</tbody></table></div></div>'
+    /* Une carte par grimpeur : pastille verte / orange / rouge, la semaine, la
+       dernière séance, la courbe de charge et les alertes. Toute la carte ouvre la fiche. */
+    (list.length ? '<div class="fl-grid">' +
+      withAlerts.map(({ c, al }) => {
+        const p = c.profile || {};
+        const status = al.some(x => x.sev === "crit") ? "crit" : al.length ? "warn" : "good";
+        const mine = sessionsOf(c.id), wk = weekProgress(mine);
+        const last = mine.filter(s => s.status === "done").pop();
+        return '<button class="fl-card ' + status + '" data-act="athlete" data-v="' + esc(c.id) + '">' +
+          '<span class="fl-head"><span class="avatar">' + esc(initials(c.name)) + '</span>' +
+            '<span class="fl-name"><b>' + esc(c.name) + '</b>' +
+              '<span class="dim tiny">' + esc(p.gradeSport || "—") + ' / ' + esc(p.gradeBoulder || "—") + '</span></span>' +
+            '<span class="fl-dot ' + status + '" title="' + esc(t("fl." + status)) + '"></span></span>' +
+          '<span class="fl-line">' + esc(t("fl.week", { done: wk.done, total: wk.total })) + ' · ' +
+            esc(last ? t("fl.lastDone", { when: relDays(last.date) }) : t("fl.noneDone")) + '</span>' +
+          '<span class="fl-spark">' + sparkline(loadSeries(c.id, 28)) + '</span>' +
+          '<span class="fl-alerts">' + (al.length
+            ? al.slice(0, 3).map(x => '<span class="chip ' + x.sev + '">' + esc(t(x.k)) + '</span>').join("") +
+              (al.length > 3 ? '<span class="chip">+' + (al.length - 3) + '</span>' : '')
+            : '<span class="chip good">' + esc(t("co.noAlerts")) + '</span>') + '</span>' +
+        '</button>';
+      }).join("") + '</div>'
       : '<div class="panel"><div class="empty">' + ic("users") + '<div class="t">' + esc(t("co.noAthletes")) + '</div>' +
         '<div class="d">' + esc(t("co.noAthletesD")) + '</div></div></div>') +
   '</div>';
@@ -339,8 +343,28 @@ function viewInbox(me){
          : '<div class="panel"><div class="empty">' + ic("check") + '<div class="t">' + esc(t("in.allClear")) + '</div>' +
            '<div class="d">' + esc(t("in.allClearD")) + '</div></div></div>') +
         (later.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("in.later")) + '</span>' +
-          '<div class="panel in-list">' + later.map(row).join("") + '</div></div>' : '')) +
+          '<div class="panel in-list">' + later.map(row).join("") + '</div></div>' : '') +
+        recentFeed()) +
   '</div>';
+}
+
+/** Dernières séances validées par les grimpeurs (7 jours) : de quoi féliciter. */
+function recentFeed(){
+  const feed = Access.climbers()
+    .flatMap(c => sessionsOf(c.id).filter(s => s.status === "done" && diffDays(today(), s.date) <= 7).map(s => ({ s, c })))
+    .sort((a, b) => (b.s.doneAt || 0) - (a.s.doneAt || 0) || (a.s.date < b.s.date ? 1 : -1))
+    .slice(0, 8);
+  if (!feed.length) return "";
+  return '<div class="stack sm"><span class="eyebrow">' + esc(t("in.feed")) + '</span><div class="panel in-list">' +
+    feed.map(({ s, c }) =>
+      '<div class="in-row feed"><span class="avatar sm">' + esc(initials(c.name)) + '</span>' +
+        '<span class="in-main"><span class="in-who">' + esc(c.name.split(" ")[0]) + ' · ' + esc(s.title) + '</span>' +
+          '<span class="in-what">' + esc(duration(s.actualMin || s.plannedMin)) + (s.rpe ? ' · ' + esc(t("pl.effort")) + ' ' + s.rpe + '/10' : '') +
+            ' · ' + esc(relDays(s.date)) + '</span>' +
+          (s.feedback ? '<span class="in-quote">« ' + esc(s.feedback) + ' »</span>' : '') + '</span>' +
+        (s.kudos ? '<span class="chip acc">' + esc(s.kudos.emoji) + ' ' + esc(t("kd.given")) + '</span>'
+                 : '<button class="btn sm" data-act="kudos" data-v="' + esc(s.id) + '">👏 ' + esc(t("kd.give")) + '</button>') +
+      '</div>').join("") + '</div></div>';
 }
 
 /* ================================================================

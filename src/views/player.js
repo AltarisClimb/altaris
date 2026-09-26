@@ -13,7 +13,9 @@ import { sessionLoad } from "../domain/workload.js";
 import { fmtNum, t } from "../i18n/index.js";
 import { ic } from "../ui/icons.js";
 import { exercisePose } from "../ui/poses.js";
+import { Remote } from "../remote.js";
 import { sessionsOf } from "./climber.js";
+import { badgeTile, badgesOf } from "./progress.js";
 import { View } from "./shell.js";
 import { TYPE_COLOR, duration } from "./today.js";
 
@@ -69,6 +71,7 @@ const playerActions = {
   async finish(){
     const p = View.player, s = Store.get("sessions", p.id);
     if (!p.rpe) return false;
+    const earnedBefore = new Set(badgesOf(s.userId).filter(b => b.earned).map(b => b.id));
     const min = Number(p.durInput) || elapsedMin(p);
     const done = p.done.length ? p.done : (s.exercises || []);
     await Store.put("sessions", s.id, Object.assign({}, s, {
@@ -78,7 +81,9 @@ const playerActions = {
     audit("session_validated", s.id + " RPE" + p.rpe + " " + min + "min (guided)");
     const me = Session.live(), all = sessionsOf(me.id);
     p.finished = { min, load: sessionLoad(p.rpe, min), done: done.length, total: (s.exercises || []).length,
-                   week: weekProgress(all), streak: weekStreak(all) };
+                   week: weekProgress(all), streak: weekStreak(all),
+                   newBadges: badgesOf(s.userId).filter(b => b.earned && !earnedBefore.has(b.id)) };
+    Remote.notify({ kind: "done", athleteId: s.userId, sessionId: s.id });
     if (tick){ clearInterval(tick); tick = null; }
     keepAwake(false);
     return true;
@@ -172,6 +177,8 @@ function viewDone(s, p, color){
       '<div class="panel"><span class="eyebrow">' + esc(t("pl.effort")) + '</span><div class="td-big">' + p.rpe + '/10</div></div>' +
       '<div class="panel"><span class="eyebrow">' + esc(t("cal.thisWeek")) + '</span><div class="td-big">' + f.week.done + '/' + f.week.total + '</div></div>' +
     '</div>' +
+    (f.newBadges.length ? '<div class="stack sm center"><span class="eyebrow acc">' + esc(t("pl.newBadge")) + '</span>' +
+      '<div class="bd-grid bd-new">' + f.newBadges.map(badgeTile).join("") + '</div></div>' : '') +
     (f.streak ? '<p class="center small">' + ic("trend") + ' ' + esc(t("pl.streak", { n: f.streak })) + '</p>' : '') +
     '<p class="center dim tiny">' + esc(t("pl.load", { n: fmtNum(f.load) })) + '</p>' +
     '<div class="pl-nav"><button class="btn ghost" data-act="play-message">' + ic("chat") + esc(t("pl.tellCoach")) + '</button>' +

@@ -35,6 +35,8 @@ export const TEXT = {
     newSession: "Nouvelle séance",
     changedSession: "Séance modifiée",
     reminder: "Séance dans 1 h",
+    done: (who: string) => who + " a terminé sa séance",
+    effort: (n: number) => "effort " + n + "/10",
     at: (date: string, time?: string) => date + (time ? " à " + time : ""),
   },
   en: {
@@ -42,6 +44,8 @@ export const TEXT = {
     newSession: "New session",
     changedSession: "Session updated",
     reminder: "Session in 1 h",
+    done: (who: string) => who + " finished a session",
+    effort: (n: number) => "effort " + n + "/10",
     at: (date: string, time?: string) => date + (time ? " at " + time : ""),
   },
 };
