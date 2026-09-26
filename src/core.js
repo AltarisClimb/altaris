@@ -4,7 +4,7 @@
    Confidential and Proprietary Systems.
    ================================================================ */
 
-const APP_VERSION = "1.5.0";
+const APP_VERSION = "1.6.0";
 const COPYRIGHT = "© 2026 ALTARIS™. All rights reserved. Registered Trademark. Confidential and Proprietary Systems.";
 
 /* ---------------- tiny DOM helpers ---------------- */

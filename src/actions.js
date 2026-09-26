@@ -1,9 +1,10 @@
 import { $, $$, addDays, clamp, esc, today, uid, weekStart } from "./core.js";
 import { Access, Session, Store, audit, config } from "./data.js";
+import { buildICS, upcomingForAgenda } from "./domain/calendar.js";
 import { trackFor } from "./domain/grades.js";
 import { batteryFor, scoreAssessment } from "./domain/scoring.js";
 import { setExercises } from "./domain/exercises.js";
-import { exportPayload, saveFile } from "./export.js";
+import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
@@ -12,6 +13,7 @@ import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
+import { sessionsOf } from "./views/climber.js";
 import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
 /* ================================================================
@@ -39,6 +41,17 @@ const ACTIONS = {
   "seed-demo": () => seedDemo(),
   "purge-demo": () => { if (confirm(t("ad.purgeConfirm"))) purgeDemo(); },
   "export-all": () => saveFile("altaris-export-" + today() + ".json", JSON.stringify(exportPayload("all"), null, 2)),
+  /* Séances à venir → fichier .ics (rappel 1 h avant), à ouvrir avec l'agenda du téléphone. */
+  "cal-export": (v) => {
+    const me = Session.live();
+    const u = (v && Access.canSee(v) && Store.get("users", v)) || me;
+    const list = upcomingForAgenda(sessionsOf(u.id));
+    if (!list.length) return toast(t("cal.nothingToExport"));
+    downloadFile("altaris-seances.ics",
+      buildICS(list, { profile: u.profile, calName: t("cal.icsName"), url: location.origin }),
+      "text/calendar;charset=utf-8");
+    toast(t("cal.exported", { n: list.length }), "good");
+  },
   "export-mine": () => saveFile("altaris-" + (Session.live()||{}).name + "-" + today() + ".json", JSON.stringify(exportPayload("mine"), null, 2)),
   "profile-edit": () => profileEditModal(),
   "acct-edit": (v) => accountEditModal(v),

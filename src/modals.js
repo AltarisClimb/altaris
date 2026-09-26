@@ -1,6 +1,7 @@
 import { $, $$, COPYRIGHT, esc, today, uid } from "./core.js";
 import { Access, Session, Store, audit } from "./data.js";
 import { Remote } from "./remote.js";
+import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
 import { FONT, SPORT, fontLabel } from "./domain/grades.js";
 import { sessionLoad } from "./domain/workload.js";
@@ -126,6 +127,9 @@ function blockEditor(userId, date, editId){
   const ex = editId ? Store.get("sessions", editId) : null;
   const routines = Store.list("routines").filter(r => r.coachId === me.id);
   let picked = new Set((ex && ex.exercises) || []);
+  const athlete = Store.get("users", userId);
+  const startTime = (ex && ex.time) ||
+    sessionStart({ date: (ex && ex.date) || date || today() }, athlete && athlete.profile) || DEFAULT_TIME;
   const render_ = (root) => {
     $("#be-ex", root).innerHTML = picked.size
       ? Array.from(picked).map(id => { const e = exById(id); return e ?
@@ -141,6 +145,10 @@ function blockEditor(userId, date, editId){
           '<input class="inp" id="be-title" value="' + esc(ex ? ex.title : "") + '" placeholder="' + esc(t("co.blockTitle")) + '"></label>' +
         '<label class="f"><span class="lb">' + esc(t("g.date")) + '</span>' +
           '<input class="inp num" type="date" id="be-date" value="' + esc(ex ? ex.date : (date || today())) + '"></label>' +
+        /* Heure de début : pour l'agenda et le rappel 1 h avant. Par défaut, le créneau déclaré par le grimpeur ce jour-là. */
+        '<label class="f"><span class="lb">' + esc(t("cal.time")) + '</span>' +
+          '<input class="inp num" type="time" id="be-time" step="300" value="' + esc(startTime) + '">' +
+          '<span class="hint">' + esc(t("cal.timeHint")) + '</span></label>' +
         '<label class="f"><span class="lb">' + esc(t("co.blockType")) + '</span><select class="inp" id="be-type">' +
           SESSION_TYPES.map(x => '<option value="' + x + '"' + (ex && ex.type === x ? " selected" : "") + '>' + esc(t("st."+x)) + '</option>').join("") + '</select></label>' +
         '<label class="f"><span class="lb">' + esc(t("co.blockDur")) + '</span>' +
@@ -195,7 +203,7 @@ function blockEditor(userId, date, editId){
         if (!userId) return toast(t("co.noAthletesD"), "crit");
         const id = ex ? ex.id : uid("s");
         await Store.put("sessions", id, Object.assign({}, ex || {}, {
-          id, userId, coachId: me.id, date: $("#be-date", root).value, title,
+          id, userId, coachId: me.id, date: $("#be-date", root).value, time: $("#be-time", root).value || null, title,
           type: $("#be-type", root).value, plannedMin: Number($("#be-dur", root).value)||0,
           targetIntensity: Number($("#be-int", root).value)||5, notes: $("#be-notes", root).value.trim(),
           exercises: Array.from(picked), status: (ex && ex.status) || "planned"

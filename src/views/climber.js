@@ -1,5 +1,6 @@
 import { addDays, diffDays, esc, sum, today } from "../core.js";
 import { Store, config } from "../data.js";
+import { sessionStart, upcomingForAgenda } from "../domain/calendar.js";
 import { exById, exName } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, band, latestAssessment, limiters } from "../domain/scoring.js";
@@ -148,8 +149,9 @@ function kpi(k, v, unit, sub, cls){
 
 function sessionCard(s, showAction){
   const done = s.status === "done";
+  const tm = sessionStart(s, (Store.get("users", s.userId) || {}).profile);
   return '<div class="stack sm">' +
-    '<div class="row" style="gap:8px"><span class="chip acc">' + esc(fmtDate(s.date, {weekday:"long",day:"numeric",month:"long"})) + '</span>' +
+    '<div class="row" style="gap:8px"><span class="chip acc">' + esc(fmtDate(s.date, {weekday:"long",day:"numeric",month:"long"})) + (tm ? ' · ' + esc(tm) : '') + '</span>' +
       '<span class="chip">' + esc(t("st."+s.type)) + '</span>' +
       '<span class="chip">' + (done ? s.actualMin : s.plannedMin) + ' ' + esc(t("g.min")) + '</span>' +
       (done ? '<span class="chip good">RPE ' + s.rpe + ' · ' + fmtNum(s.load) + ' ' + esc(t("ld.au")) + '</span>' : '') + '</div>' +
@@ -168,7 +170,9 @@ function sessionCard(s, showAction){
 /* ================================================================
    13. CALENDAR
    ================================================================ */
-function viewCalendar(user, asCoach){
+/* Coach : grille de la semaine, glisser-déposer pour déplacer une séance. */
+function planningGrid(user){
+  const asCoach = true;
   const u = user, p = u.profile || {};
   const ws = View.weekOf;
   const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
@@ -203,7 +207,7 @@ function viewCalendar(user, asCoach){
       '<div class="cal">' +
         DAYS.map(d => '<div class="dh">' + esc(d[LI()].slice(0,3)) + '</div>').join("") +
         days.map((d, di) => {
-          const list = all.filter(s => s.date === d);
+          const list = all.filter(s => s.date === d).sort(byTime(p));
           const slots = avail.filter(s => s.day === di);
           const isToday = d === today(), isPast = diffDays(today(), d) > 0;
           return '<div class="day' + (isToday ? " today" : "") + (isPast ? " past" : "") + '" data-drop="' + d + '">' +
@@ -214,7 +218,8 @@ function viewCalendar(user, asCoach){
               return '<button class="blk ' + cls + '" data-act="session-open" data-v="' + esc(s.id) + '"' +
                 (asCoach ? ' draggable="true" data-drag="' + esc(s.id) + '"' : '') + '>' +
                 '<span class="bt">' + esc(s.title) + '</span>' +
-                '<span class="bm">' + (s.status === "done" ? "RPE " + s.rpe + " · " + fmtNum(s.load) : (s.plannedMin||0) + "′ · I" + (s.targetIntensity||5)) + '</span></button>';
+                '<span class="bm">' + (s.status === "done" ? "RPE " + s.rpe + " · " + fmtNum(s.load)
+                  : (sessionStart(s, p) ? sessionStart(s, p) + " · " : "") + (s.plannedMin||0) + "′ · I" + (s.targetIntensity||5)) + '</span></button>';
             }).join("") +
             (asCoach ? '<button class="btn xs ghost" style="margin-top:auto;opacity:.6" data-act="block-new" data-v="' + esc(u.id) + '" data-d="' + d + '">' + ic("plus") + '</button>' : '') +
           '</div>';
@@ -222,13 +227,113 @@ function viewCalendar(user, asCoach){
       '</div>' +
     '</div>' +
 
-    (!asCoach ? '<div class="panel pad stack sm"><div class="between"><span class="eyebrow">' + esc(t("cal.myAvail")) + '</span>' +
-      '<button class="btn xs" data-act="avail-edit">' + ic("edit") + esc(t("cal.editAvail")) + '</button></div>' +
-      (avail.length ? '<div class="row tight">' + avail.map(s =>
-        '<span class="chip">' + esc(DAYS[s.day][LI()].slice(0,3)) + ' ' + esc(s.start) + '–' + esc(s.end) + ' · ' + esc(t("st."+s.type)) + '</span>').join("") + '</div>'
-        : '<p class="dim tiny">' + esc(t("on.availD")) + '</p>') + '</div>' : '') +
   '</div>';
 }
+
+/** Tri d'une journée par heure de début (séances sans heure en dernier). */
+function byTime(profile){
+  return (a, b) => (sessionStart(a, profile) || "99") < (sessionStart(b, profile) || "99") ? -1 : 1;
+}
+/** 90 → « 1 h 30 », 45 → « 45 min ». */
+function fmtDuration(min){
+  const m = Math.round(min || 0);
+  if (m < 60) return m + " " + t("g.min");
+  return Math.floor(m / 60) + " h" + (m % 60 ? " " + String(m % 60).padStart(2, "0") : "");
+}
+/** « Aujourd'hui », « Demain » ou « mercredi 1 octobre ». */
+function dayLabel(d){
+  const dd = diffDays(d, today());
+  if (dd === 0) return t("g.today");
+  if (dd === 1) return t("cal.tomorrow");
+  return fmtDate(d, { weekday: "long", day: "numeric", month: "long" });
+}
+/** Statut lisible d'une séance : [libellé, classe de puce]. */
+function sessionStatus(s){
+  if (s.status === "done") return [t("cal.done") + (s.rpe ? " · RPE " + s.rpe : ""), "good"];
+  if (s.status === "missed") return [t("cal.missed"), "crit"];
+  if (diffDays(today(), s.date) > 0) return [t("ov.toValidate"), "warn"];
+  return [t("cal.planned"), ""];
+}
+
+/* Grimpeur : agenda lisible, la prochaine séance en tête, puis la semaine jour par jour. */
+function agenda(u){
+  const p = u.profile || {};
+  const ws = View.weekOf;
+  const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
+  const all = sessionsOf(u.id);
+  const inWeek = all.filter(s => days.indexOf(s.date) >= 0 && s.type !== "rest");
+  const doneN = inWeek.filter(s => s.status === "done").length;
+  const plannedMin = sum(inWeek.map(s => s.plannedMin || 0));
+  const avail = p.availability || [];
+  const next = nextSession(u.id);
+  const nextTime = next && sessionStart(next, p);
+  const upcoming = upcomingForAgenda(all).length;
+
+  return '<div class="stack lg">' +
+    '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
+      '<h2>' + esc(t("cal.mySessions")) + '</h2></div>' +
+      '<div class="row tight noprint">' +
+        '<button class="btn sm pri" data-act="cal-export" data-v="' + esc(u.id) + '"' + (upcoming ? '' : ' disabled') + '>' +
+          ic("cal") + esc(t("cal.addToAgenda")) + '</button></div></div>' +
+
+    (next ? '<div class="panel pad stack sm ag-next">' +
+      '<span class="eyebrow">' + esc(t("ov.nextSession")) + '</span>' +
+      '<div class="ag-when">' + esc(dayLabel(next.date)) + (nextTime ? ' · ' + esc(nextTime) : '') + '</div>' +
+      '<div class="ag-title">' + esc(next.title) + '</div>' +
+      '<div class="row tight"><span class="chip">' + esc(t("st." + next.type)) + '</span>' +
+        '<span class="chip">' + esc(fmtDuration(next.plannedMin)) + '</span>' +
+        '<span class="chip">' + esc(t("cal.intensity", { n: next.targetIntensity || 5 })) + '</span></div>' +
+      '<div class="row tight noprint"><button class="btn sm" data-act="session-open" data-v="' + esc(next.id) + '">' +
+        ic("list") + esc(t("cal.sessionSheet")) + '</button>' +
+        (diffDays(today(), next.date) >= 0 ? '<button class="btn sm pri" data-act="validate" data-v="' + esc(next.id) + '">' +
+          ic("check") + esc(t("ov.validate")) + '</button>' : '') + '</div>' +
+    '</div>' : '') +
+
+    '<div class="between noprint">' +
+      '<div class="row tight">' +
+        '<button class="btn icon sm ghost" data-act="week" data-v="-1" aria-label="' + esc(t("g.previous")) + '">' + ic("chevL") + '</button>' +
+        '<button class="btn sm ghost" data-act="week" data-v="0">' + esc(t("cal.thisWeek")) + '</button>' +
+        '<button class="btn icon sm ghost" data-act="week" data-v="1" aria-label="' + esc(t("g.next")) + '">' + ic("chevR") + '</button>' +
+      '</div>' +
+      '<span class="small muted">' + esc(fmtDate(ws, { day: "numeric", month: "short" })) + ' – ' +
+        esc(fmtDate(addDays(ws, 6), { day: "numeric", month: "short" })) + '</span>' +
+    '</div>' +
+    (inWeek.length ? '<p class="small muted">' + esc(t("cal.weekSummary", { done: doneN, total: inWeek.length, time: fmtDuration(plannedMin) })) + '</p>' : '') +
+
+    '<div class="panel ag">' + days.map((d, di) => {
+      const list = all.filter(s => s.date === d).sort(byTime(p));
+      const slots = avail.filter(a => a.day === di);
+      const isToday = d === today();
+      return '<div class="ag-day' + (isToday ? ' today' : '') + (diffDays(today(), d) > 0 ? ' past' : '') + '">' +
+        '<div class="ag-dh">' + esc(fmtDate(d, { weekday: "long", day: "numeric", month: "long" })) +
+          (isToday ? ' <span class="chip acc">' + esc(t("g.today")) + '</span>' : '') + '</div>' +
+        (list.length ? list.map(s => {
+          const st = sessionStatus(s), tm = sessionStart(s, p);
+          const due = st[1] === "warn";
+          return '<button class="ag-row" data-act="' + (due ? 'validate' : 'session-open') + '" data-v="' + esc(s.id) + '">' +
+            '<span class="ag-time">' + esc(tm || "—") + '</span>' +
+            '<span class="ag-main"><span class="ag-t">' + esc(s.title) + '</span>' +
+              '<span class="ag-m">' + esc(t("st." + s.type)) + (s.type === "rest" ? '' : ' · ' + esc(fmtDuration(s.status === "done" ? s.actualMin : s.plannedMin)) +
+                ' · ' + esc(t("cal.intensity", { n: s.targetIntensity || 5 }))) + '</span></span>' +
+            '<span class="chip ' + st[1] + '">' + esc(st[0]) + '</span>' + ic("chevR", "chev") +
+          '</button>';
+        }).join("")
+        : '<div class="ag-empty">' + esc(t("cal.rest")) +
+            (slots.length ? ' · ' + slots.map(a => esc(t("cal.availSlot", { start: a.start, end: a.end }))).join(", ") : '') + '</div>') +
+      '</div>';
+    }).join("") + '</div>' +
+
+    '<p class="dim tiny noprint">' + esc(t("cal.addToAgendaD")) + '</p>' +
+
+    '<div class="panel pad stack sm"><div class="between"><span class="eyebrow">' + esc(t("cal.myAvail")) + '</span>' +
+      '<button class="btn xs" data-act="avail-edit">' + ic("edit") + esc(t("cal.editAvail")) + '</button></div>' +
+      (avail.length ? '<div class="row tight">' + avail.map(a =>
+        '<span class="chip">' + esc(DAYS[a.day][LI()].slice(0,3)) + ' ' + esc(a.start) + '–' + esc(a.end) + ' · ' + esc(t("st."+a.type)) + '</span>').join("") + '</div>'
+        : '<p class="dim tiny">' + esc(t("on.availD")) + '</p>') + '</div>' +
+  '</div>';
+}
+
+function viewCalendar(user, asCoach){ return asCoach ? planningGrid(user) : agenda(user); }
 
 function painLabel(k){
   const M = {
