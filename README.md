@@ -13,19 +13,24 @@ src/
   main.js               amorçage et boucle de rendu
   bus.js                relie la couche de données au rendu sans cycle d'imports
   core.js               helpers DOM, dates, arithmétique
-  data.js               persistance, session, RBAC  ← la couture Supabase
+  config.js             URL + clé publique Supabase (vide = mode local)
+  remote.js             client Supabase : connexion, profils, exercices, affectations
+  data.js               persistance locale, session, RBAC côté client
   i18n/                 fr-FR.js · en-US.js · index.js
   domain/               grades.js · scoring.js · workload.js · exercises.js
-  ui/                   tokens.css · components.css · icons · charts · brand · feedback
+  ui/                   tokens.css · components.css · icons · charts · brand · feedback · poses
+  vendor/               supabase.js (client officiel, MIT, copié tel quel)
   views/                shell · auth · onboarding · climber · testing · library · staff
   modals.js  seed.js  export.js  actions.js
 tests/                  suite exécutable avec node --test
+supabase/               migrations SQL, seed généré, tests RLS
+scripts/                serve, test-db, build-seed, build-bank-v2
 sw.js                   service worker (mode hors ligne)
 manifest.webmanifest    manifeste PWA
 vercel.json             en-têtes de sécurité et politique de cache
 ```
 
-**Modules ES natifs, aucune étape de build, aucune dépendance npm.** Le
+**Modules ES natifs, aucune étape de build, aucune dépendance npm** (le client Supabase est copié dans `src/vendor/`). Le
 navigateur charge `src/main.js` et résout les imports lui-même. `package.json`
 ne sert qu'à lancer les tests.
 
@@ -61,26 +66,22 @@ le protocole HTTP.
    `actions.js`.** C'est ce qui permet de tester le métier sous Node sans
    navigateur. Le bus de rendu (`bus.js`) existe pour ça.
 
-## 2. LIRE AVANT DE DÉPLOYER — le point qui change tout
+## 2. LIRE AVANT DE DÉPLOYER — où vivent les données
 
-Dans sa version publiée comme artefact Claude, l'application utilise la base de
-données du runtime Claude. Ce runtime **n'existe pas** sur Vercel, Cloudflare ou
-GitHub Pages.
+Tout dépend de `src/config.js` :
 
-L'application le détecte et bascule automatiquement en **mode local** :
-les données restent dans le `localStorage` du navigateur. Le pied de page
-affiche « Mode local ».
+- **Rempli** (URL du projet + clé publique Supabase) : connexion par e-mail et
+  mot de passe, comptes, rôles, rattachements coach et bibliothèque d'exercices
+  sur Supabase, protégés par la RLS. Le pied de page affiche « Comptes
+  synchronisés ».
+- **Vide** : **mode local**, comme avant — profils à code PIN, tout dans le
+  `localStorage` du navigateur. Le pied de page affiche « Mode local ». Utile
+  pour une démo hors ligne.
 
-Conséquence directe :
-
-> **Chaque navigateur a sa propre base. Le coach ne voit pas les données de ses
-> athlètes. La messagerie ne transmet rien.**
-
-Déployer tel quel donne donc une **vitrine parfaitement fonctionnelle en
-mono-poste** — idéale pour une démo commerciale, une levée, un test UX — mais
-pas le produit multi-utilisateurs.
-
-Pour obtenir le vrai produit, il faut brancher un backend : voir §5.
+> **Encore sur l'appareil, même avec Supabase :** tests, séances, douleurs,
+> messages, routines, paramètres et journal d'audit. Tant qu'ils ne sont pas
+> migrés (§5), le coach ne voit pas ces données chez ses athlètes et la
+> messagerie ne transmet rien.
 
 ---
 
@@ -135,47 +136,46 @@ Ou glisse-dépose le dossier sur app.netlify.com/drop.
 
 ---
 
-## 5. Passer au vrai multi-utilisateurs — Supabase
+## 5. Supabase — ce qui est en place
 
-Le choix rationnel, parce qu'il coche exactement le cahier des charges :
+Projet en **région UE explicite** (Paris, Francfort), pas le groupe « Europe »
+qui inclut Londres et Zurich.
 
-| Besoin du CDC | Brique Supabase |
+| Élément | Où |
 |---|---|
-| PostgreSQL | Postgres managé |
-| Stockage vidéo sécurisé (S3) | Supabase Storage |
-| RBAC hermétique entre rôles | **Row Level Security** — appliqué côté serveur |
-| Mise à jour temps réel | Realtime (remplace `onSnapshot` presque 1:1) |
-| RGPD / résidence UE | régions UE au choix + DPA signable |
-| Authentification | Auth intégrée (e-mail, magic link, OAuth) |
+| Schéma + RLS (`profiles`, `exercises`, `assignments`) | `supabase/migrations/` |
+| Tests des droits d'accès | `supabase/tests/rls.sql` — `scripts/test-db.sh`, et la CI à chaque push |
+| Client (connexion, profils, exercices, affectations) | `src/remote.js`, client vendorisé `src/vendor/supabase.js` |
+| Clé et URL du projet | `src/config.js` (clé publiable uniquement, jamais `service_role`) |
+| Banque d'exercices v2 (82 exercices × 3 variantes + silhouettes) | `node scripts/build-bank-v2.mjs <outil-entrainement-escalade.html>` → migration |
 
-Tarifs : **Free 0 $** (500 Mo de base, 1 Go de stockage, 5 Go de trafic,
-50 000 utilisateurs actifs/mois) — largement suffisant pour un pilote.
-**Pro 25 $/mois** (8 Go de base, 100 Go de stockage, 250 Go de trafic).
+**Rôles :** `admin` (coach avec super-pouvoirs : voit tous les grimpeurs et gère
+la plateforme), `teacher` (coach : ses grimpeurs), `student` (grimpeur). Tout
+nouveau compte est `student` ; un admin change le rôle dans l'onglet Comptes.
+Le premier admin se crée depuis le SQL Editor :
 
-⚠️ Choisis une **région UE explicite** (Paris, Francfort), pas le groupe
-« Europe » qui inclut Londres et Zurich — hors UE.
+```sql
+update public.profiles set role = 'admin' where email = 'vous@exemple.fr';
+```
 
-### Ce qu'il y a à faire dans le code
+**Exercices :** `library` = visibles des coachs et admins, et d'un grimpeur
+seulement une fois assignés (fiche de l'exercice → « Assigner »). `free` =
+visibles de tous ; seul un admin peut publier en `free`.
 
-Presque rien, et c'est voulu : toute la persistance est isolée dans un seul
-objet, `Store`, au début du fichier (section 2, ~150 lignes). Il expose cinq
-méthodes : `init`, `list`, `get`, `put`, `del`.
+**Appliquer une nouvelle migration :** SQL Editor du projet (coller le fichier),
+ou `npx supabase db push` après `npx supabase link`.
 
-1. Remplacer `claude.use("db")` par le client Supabase.
-2. Mapper `onSnapshot` sur `supabase.channel().on('postgres_changes', …)`.
-3. Remplacer l'écran de code PIN par `supabase.auth`.
-4. Écrire les politiques RLS — c'est là qu'est la vraie valeur : le cloisonnement
-   coach/athlète devient **inviolable côté serveur**, alors qu'il est aujourd'hui
-   seulement appliqué côté client dans l'objet `Access`.
+**E-mails :** SMTP personnalisé (Authentication → Emails → SMTP Settings) et
+modèles dont les liens pointent vers le site :
+`{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email` (inscription),
+`type=recovery` (mot de passe), `type=invite` (invitation).
 
-Estimation : **2 à 4 jours**. Le reste du fichier ne bouge pas.
+### Reste à migrer
 
-### Les 8 tables à créer
-
-`users` · `assessments` · `sessions` · `pain` · `threads` · `routines` ·
-`config` · `audit`
-
-Elles correspondent une pour une à la constante `COLS` dans `index.html`.
+`assessments` · `sessions` · `pain` · `threads` · `routines` · `config` ·
+`audit` sont encore dans `Store` (`src/data.js`). Chacun demande une table,
+ses politiques RLS et des cas dans `rls.sql`. Ce sont des données de santé :
+voir la liste §7 avant.
 
 ---
 
@@ -196,8 +196,8 @@ rendu serveur, découpage d'équipe — pas par réflexe.
 
 Rappel des points signalés lors de la livraison :
 
-- [ ] Authentification réelle (le code à 4 chiffres est un garde-fou d'usage, pas une sécurité)
-- [ ] RLS côté serveur (aujourd'hui le RBAC est côté client)
+- [x] Authentification réelle (Supabase Auth, e-mail + mot de passe)
+- [ ] RLS côté serveur — fait pour comptes, exercices et affectations ; reste les données d'entraînement et de santé (§5)
 - [ ] Consentement explicite RGPD article 9 pour les données de santé + AIPD
 - [ ] Politique de conservation et de suppression des données
 - [ ] Vérifier si l'hébergement de données de santé pour le compte de tiers déclenche la certification **HDS** en France

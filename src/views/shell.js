@@ -2,6 +2,7 @@ import { APP_VERSION, COPYRIGHT, diffDays, esc, sum, today, weekStart } from "..
 import { Access, Session, Store } from "../data.js";
 import { alertsFor } from "../domain/workload.js";
 import { LANG, t } from "../i18n/index.js";
+import { Remote } from "../remote.js";
 import { logo } from "../ui/brand.js";
 import { ic } from "../ui/icons.js";
 import { unreadCount } from "./library.js";
@@ -86,8 +87,11 @@ function legalFooter(){
   return '<footer class="legal"><div>' + esc(COPYRIGHT) + '</div>' +
     '<div class="noprint" style="margin-top:5px">' + esc(t("app.confidential")) + ' · ALTARIS™ Pro Platform ' + APP_VERSION +
     ' · <button data-act="legal" style="color:var(--accent);font-size:11px;font-weight:600">' + esc(t("lg.honest")) + '</button>' +
-    (Store.mode === "local" ? ' · <span style="color:var(--warn)">' + esc(t("auth.localMode")) + '</span>' : "") +
-    (Store.queue.length ? ' · <span style="color:var(--warn)">' + Store.queue.length + ' ⇅</span>' : "") +
+    /* Mode Supabase : les comptes sont en ligne, le reste encore sur l'appareil. */
+    (Remote.client ? ' · <span title="' + esc(t("auth.syncModeD")) + '">' + esc(t("auth.syncMode")) + '</span>'
+      : Store.mode === "local" ? ' · <span style="color:var(--warn)">' + esc(t("auth.localMode")) + '</span>' : "") +
+    /* File d'attente vers la base de l'artefact : sans objet en mode Supabase. */
+    (!Remote.client && Store.queue.length ? ' · <span style="color:var(--warn)">' + Store.queue.length + ' ⇅</span>' : "") +
     '</div>' +
     (me ? '<div class="printonly" style="margin-top:6px">' + esc(t("lg.watermark")) + ' — ' + esc(me.name) + ' · ' + esc(me.id) + ' · ' + esc(new Date().toISOString()) + '</div>' : "") +
   '</footer>';

@@ -109,6 +109,29 @@ const Remote = {
     return data;
   },
 
+  /** Affectations visibles : un coach voit celles de ses grimpeurs, un admin
+   *  toutes, un grimpeur les siennes. Gardées en mémoire pour les vues. */
+  assignments: [],
+  async loadAssignments(){
+    const { data, error } = await this.client.from("assignments").select("id, exercise_id, student_id");
+    if (error) throw error;
+    this.assignments = data;
+    return data;
+  },
+  async assign(exerciseUuid, studentId){
+    const me = await this.userId();
+    const { error } = await this.client.from("assignments")
+      .insert({ exercise_id: exerciseUuid, student_id: studentId, assigned_by: me });
+    if (error && error.code !== "23505") throw error;       // déjà assigné : rien à faire
+    await this.loadAssignments();
+  },
+  async unassign(id){
+    const { data, error } = await this.client.from("assignments").delete().eq("id", id).select("id");
+    if (error) throw error;
+    if (!data.length) throw new Error("assignment delete not permitted");
+    await this.loadAssignments();
+  },
+
   async updateProfile(id, patch){
     /* Une ligne refusée par la RLS ne renvoie pas d'erreur, juste zéro ligne. */
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");

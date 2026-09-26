@@ -91,6 +91,7 @@ async function loadExercises(){
   }catch(e){
     try{ const rows = JSON.parse(localStorage.getItem(key) || "null"); if (rows) setExercises(rows.map(fromRow)); }catch(e2){}
   }
+  try{ await Remote.loadAssignments(); }catch(e){ /* hors ligne : la liste d'affectations reste vide */ }
   render();
 }
 

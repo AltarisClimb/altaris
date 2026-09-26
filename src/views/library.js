@@ -1,10 +1,11 @@
-import { $, addDays, byId, esc } from "../core.js";
-import { Access, Session, Store, config } from "../data.js";
+import { $, $$, addDays, byId, esc } from "../core.js";
+import { Access, Session, Store, audit, config } from "../data.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
 import { latestAssessment } from "../domain/scoring.js";
 import { LI, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
-import { body } from "../main.js";
+import { body, render } from "../main.js";
+import { Remote } from "../remote.js";
 import { topo } from "../ui/brand.js";
 import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
@@ -24,6 +25,8 @@ function viewExercises(){
     (!q || exName(e).toLowerCase().indexOf(q) >= 0 || exField(e, "m").toLowerCase().indexOf(q) >= 0 || exField(e, "d").toLowerCase().indexOf(q) >= 0));
   const counts = {}; EX_CATS.forEach(c => counts[c] = EXERCISES.filter(e => e.cat === c).length);
   const routines = Store.list("routines").filter(r => !me || me.role === "admin" || r.coachId === me.id);
+  /* Nombre d'affectations visibles (grimpeur : 1 si l'exercice lui est assigné). */
+  const nAssigned = (e) => e.uuid ? Remote.assignments.filter(a => a.exercise_id === e.uuid).length : 0;
 
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ex.title")) + '</span>' +
@@ -62,10 +65,36 @@ function viewExercises(){
           (exVideo(e.id) ? '<span style="color:var(--accent);flex:none">' + ic("video") + '</span>' : '') + '</span>' +
         '<span class="ed">' + esc(exField(e, "d")) + '</span>' +
         '<span class="em"><span class="chip">' + esc(t("ex.cat."+e.cat)) + '</span>' +
-          '<span class="chip">' + esc(EX_LV_LB[e.lv][LI()]) + '</span></span>' +
+          '<span class="chip">' + esc(EX_LV_LB[e.lv][LI()]) + '</span>' +
+          (nAssigned(e) ? '<span class="chip acc">' + esc(me && me.role === "climber" ? t("ex.assignedMe") : t("ex.assignedN", { n: nAssigned(e) })) + '</span>' : '') +
+        '</span>' +
       '</button>').join("") + '</div>'
+      : (!EXERCISES.length && Remote.client && me && me.role === "climber")
+      ? '<div class="panel"><div class="empty">' + ic("book") + '<div class="t">' + esc(t("ex.emptyClimber")) + '</div>' +
+        '<div class="d">' + esc(t("ex.emptyClimberD")) + '</div></div></div>'
       : '<div class="panel"><div class="empty">' + ic("search") + '<div class="t">' + esc(t("ex.noResult")) + '</div>' +
         '<button class="btn sm" style="margin-top:12px" data-act="ex-reset">' + esc(t("g.reset")) + '</button></div></div>') +
+  '</div>';
+}
+
+/** Coach/admin en mode Supabase : à qui cet exercice est assigné, et l'assigner à un de ses grimpeurs. */
+function assignSection(e, me){
+  if (!Remote.client || !isStaff(me) || !e.uuid) return "";
+  const mine = Access.climbers();
+  const assigned = Remote.assignments.filter(a => a.exercise_id === e.uuid);
+  const taken = new Set(assigned.map(a => a.student_id));
+  const free = mine.filter(c => !taken.has(c.id));
+  const nameOf = (sid) => (Store.get("users", sid) || {}).name || "—";
+  return '<div class="stack sm"><span class="eyebrow">' + esc(t("ex.assignedTo")) + '</span>' +
+    (assigned.length
+      ? '<div class="row tight">' + assigned.map(a => '<span class="chip acc">' + esc(nameOf(a.student_id)) +
+          '<button data-unassign="' + esc(a.id) + '" aria-label="' + esc(t("g.delete")) + '">' + ic("x") + '</button></span>').join("") + '</div>'
+      : '<p class="dim tiny">' + esc(t("ex.assignNone")) + '</p>') +
+    (free.length
+      ? '<span class="unit"><select class="inp" id="exa"><option value="">' + esc(t("ex.assignPick")) + '</option>' +
+          free.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + '</option>').join("") + '</select>' +
+        '<button class="u" id="exa-add" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("ex.assign")) + '</button></span>'
+      : (mine.length ? '' : '<p class="dim tiny">' + esc(t("co.noAthletesD")) + '</p>')) +
   '</div>';
 }
 
@@ -111,12 +140,29 @@ function exerciseModal(id){
           '<span class="unit"><input class="inp" id="exv" placeholder="https://…" value="' + esc(vid||"") + '">' +
           '<button class="u" id="exv-save" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("g.save")) + '</button></span>' : '') +
       '</div>' +
+      assignSection(e, me) +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>',
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       const b = $("#exv-save", root);
       if (b) b.onclick = async () => { await setExVideo(id, $("#exv", root).value.trim()); toast(t("g.saved"), "good"); Modal.close(); };
+      /* Affectations : le serveur (RLS) vérifie que le grimpeur est bien le vôtre. */
+      const reopen = () => { exerciseModal(id); render(); };
+      const add = $("#exa-add", root);
+      if (add) add.onclick = async () => {
+        const sid = $("#exa", root).value; if (!sid) return;
+        try{ await Remote.assign(e.uuid, sid); }
+        catch(err){ return toast(t("er.saveFailed"), "crit"); }
+        audit("exercise_assigned", exName(e) + " → " + ((Store.get("users", sid) || {}).name || sid));
+        toast(t("ex.assigned"), "good"); reopen();
+      };
+      $$("[data-unassign]", root).forEach(x => x.onclick = async () => {
+        try{ await Remote.unassign(x.dataset.unassign); }
+        catch(err){ return toast(t("er.saveFailed"), "crit"); }
+        audit("exercise_unassigned", exName(e));
+        reopen();
+      });
     }
   });
 }
