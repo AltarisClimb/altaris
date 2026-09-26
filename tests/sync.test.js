@@ -140,3 +140,23 @@ test("marquer comme lu enregistre mon marqueur, relu à la synchronisation", asy
   await Store.syncMessages();
   assert.equal(Store.data.threads[ATH].read[COACH], 1700000000000);
 });
+
+test("à la déconnexion, les données rendues par le serveur sont effacées de l'appareil", async () => {
+  const removed = [];
+  globalThis.localStorage = { getItem: () => null, setItem(){}, removeItem: (k) => removed.push(k) };
+  Remote.signOut = async () => {};
+  Store.data.sessions["s-1"] = { id: "s-1", userId: ATH };
+  Store.data.threads[ATH] = { id: ATH, messages: [{ id: "m-1", text: "salut" }] };
+  Store.data.pain["p-1"] = { id: "p-1", userId: ATH };               // encore local uniquement
+  Store.queue = [{ op: "set", col: "sessions", id: "s-2", doc: { id: "s-2", userId: ATH }, remote: true }];
+  try{
+    Session.signOut();
+    assert.deepEqual(Store.data.sessions, {});
+    assert.deepEqual(Store.data.threads, {});
+    assert.ok(Store.data.pain["p-1"], "les données encore locales ne doivent pas être perdues");
+    assert.ok(Store.queue.some(q => q.id === "s-2"), "une écriture non envoyée reste en file");
+    assert.ok(removed.includes("altaris.exercises." + COACH));
+  } finally {
+    delete globalThis.localStorage;
+  }
+});

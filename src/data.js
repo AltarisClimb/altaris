@@ -251,6 +251,17 @@ const Store = {
     }, (row) => this.addMessage(row));
   },
 
+  /** Sign-out on a shared device: drop what the server gives back at the next
+   *  sign-in (REMOTE_COLS, messages, offline exercise list). Device-only
+   *  collections and unsent writes in the queue are kept — deleting them here
+   *  would lose them for good. */
+  clearRemote(userId){
+    REMOTE_COLS.forEach(c => { this.data[c] = {}; });
+    this.data.threads = {};
+    this.saveLocal();
+    try{ if (userId) localStorage.removeItem("altaris.exercises." + userId); }catch(e){}
+  },
+
   _enqueue(item){
     this.queue = this.queue.filter(q => !(q.col === item.col && q.id === item.id));
     this.queue.push(item);
@@ -342,9 +353,10 @@ const Session = {
   },
   signOut(){
     audit("sign_out", "");
+    const id = this.user && this.user.id;
     this.user = null;
     try{ localStorage.removeItem("altaris.session"); }catch(e){}
-    if (Remote.client) Remote.signOut();
+    if (Remote.client){ Store.clearRemote(id); Remote.signOut(); }
     /* Le choix de l'onglet appartient à la couche vue : le dispatcher le
        remet à zéro avant d'appeler signOut(). Garder cette ligne ici
        ferait dépendre la couche de données de l'interface. */

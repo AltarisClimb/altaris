@@ -25,14 +25,6 @@
 <div id="modal-root"></div>
 
 <script type="module" src="src/main.js"></script>
-<script>
-/* Progressive Web App — real offline support, CDC §7.
-   Only registers over http(s); a file:// open stays a plain page. */
-if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
-  });
-}
-</script>
+<script src="src/sw-register.js"></script>
 </body>
 </html>
