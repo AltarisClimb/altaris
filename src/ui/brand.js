@@ -16,7 +16,7 @@ function logo(h, opts){
       '<svg width="' + round((o.wordH || h * 1.15) / WORD_H * 1000, 1) + '" height="' + (o.wordH || h * 1.15) +
       '" viewBox="0 0 1000 ' + WORD_H + '" role="img" aria-hidden="true">' +
       '<path class="wd" fill-rule="evenodd" d="' + WORD_D + '"/></svg>' +
-      '<sup style="font:600 8px var(--sans);color:var(--ink-3);letter-spacing:.04em;align-self:flex-start;margin-top:2px">TM</sup>') +
+      '<sup style="font:600 8px var(--sans);color:var(--brand);opacity:.7;letter-spacing:.04em;align-self:flex-start;margin-top:2px">TM</sup>') +
   '</span>';
 }
 /* Topographic rule — contour lines echoing the mark, used as a section divider. */

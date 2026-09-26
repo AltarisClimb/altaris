@@ -31,8 +31,8 @@ a{color:var(--accent); text-decoration:none}
 /* ---------- brand lockup ---------- */
 .brand{display:flex; align-items:center; gap:9px; min-width:0}
 .brand svg{display:block; flex:none}
-.brand .mk{fill:var(--accent)}
-.brand .wd{fill:var(--ink)}
+.brand .mk{fill:var(--brand)}
+.brand .wd{fill:var(--brand)}
 .brand .tm{font:600 8px/1 var(--sans); fill:var(--ink-3); letter-spacing:.06em}
 
 /* ---------- app shell ---------- */

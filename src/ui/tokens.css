@@ -8,6 +8,7 @@
   --surface:#0F172A; --surface-2:#15203A; --surface-3:#1C2A49;
   --line:#243352; --line-soft:#1A2740;
   --ink:#E8EEF8; --ink-2:#9FB0CB; --ink-3:#6B7E9E;
+  --brand:#FFFFFF;                         /* logo ALTARIS : blanc en mode nuit */
   --accent:#22D3EE; --accent-2:#67E8F9; --accent-ink:#04141B; --accent-dim:#0E7C93;
   --accent-wash:rgba(34,211,238,.10); --accent-line:rgba(34,211,238,.30);
   --good:#35C48D; --warn:#E8A33D; --crit:#E8654F;
@@ -28,6 +29,7 @@
   --surface:#FFFFFF; --surface-2:#F5F8FC; --surface-3:#E8EFF8;
   --line:#D2DCEA; --line-soft:#E3EAF4;
   --ink:#0F172A; --ink-2:#4A5B7A; --ink-3:#74859F;
+  --brand:#0B1D3A;                         /* logo ALTARIS : bleu nuit en mode jour */
   --accent:#0E7490; --accent-2:#0891B2; --accent-ink:#FFFFFF; --accent-dim:#0E7490;
   --accent-wash:rgba(14,116,144,.09); --accent-line:rgba(14,116,144,.28);
   --good:#0F8A5F; --warn:#B5730B; --crit:#C0453A;
