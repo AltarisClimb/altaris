@@ -13,14 +13,35 @@ const DICTS = { fr: FR, en: EN };
 const FALLBACK = "fr";
 
 /* --- language state --- */
-let LANG = (function(){
-  try{
-    const st = localStorage.getItem("altaris.lang");
-    if (st === "fr" || st === "en") return st;
-  }catch(e){}
-  try{ return (navigator.language || "fr").toLowerCase().indexOf("en") === 0 ? "en" : "fr"; }catch(e){ return "fr"; }
+/** First supported language in the user's preference list ("de-DE", "en-GB" → "en"). */
+function pickLang(tags){
+  for (const tag of tags || []){
+    const base = String(tag || "").toLowerCase().split("-")[0];
+    if (DICTS[base]) return base;
+  }
+  return FALLBACK;
+}
+function systemLang(){
+  try{ return pickLang(navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]); }
+  catch(e){ return FALLBACK; }
+}
+
+/* "auto" follows the system; "fr" / "en" is an explicit choice kept in localStorage. */
+let LANG_PREF = (function(){
+  try{ const st = localStorage.getItem("altaris.lang"); if (DICTS[st]) return st; }catch(e){}
+  return "auto";
 })();
+let LANG = LANG_PREF === "auto" ? systemLang() : LANG_PREF;
 const LI = () => (LANG === "en" ? 1 : 0);
+
+function applyLang(){
+  LANG = LANG_PREF === "auto" ? systemLang() : LANG_PREF;
+  try{ document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR"); }catch(e){}
+  requestRender();
+}
+if (typeof window !== "undefined"){
+  window.addEventListener("languagechange", () => { if (LANG_PREF === "auto") applyLang(); });
+}
 /** Traduit une clé. Repli sur le français puis sur la clé brute,
  *  pour qu'une clé manquante reste visible au lieu de rendre du vide. */
 function t(key, vars){
@@ -31,11 +52,14 @@ function t(key, vars){
   if (vars) for (const k in vars) s = s.replace(new RegExp("\\{" + k + "\\}", "g"), vars[k]);
   return s;
 }
-function setLang(l){
-  LANG = l;
-  try{ localStorage.setItem("altaris.lang", l); }catch(e){}
-  document.documentElement.setAttribute("lang", l === "en" ? "en-US" : "fr-FR");
-  requestRender();
+/** "auto" or a DICTS key. */
+function setLang(pref){
+  LANG_PREF = DICTS[pref] ? pref : "auto";
+  try{
+    if (LANG_PREF === "auto") localStorage.removeItem("altaris.lang");
+    else localStorage.setItem("altaris.lang", LANG_PREF);
+  }catch(e){}
+  applyLang();
 }
 /** locale-aware helpers */
 const LOC = () => (LANG === "en" ? "en-US" : "fr-FR");
@@ -50,4 +74,4 @@ function relDays(dateStr){
   return n > 0 ? "il y a " + n + " j" : "dans " + (-n) + " j";
 }
 
-export { DICTS, LANG, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, relDays, setLang, t };
+export { DICTS, LANG, LANG_PREF, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, pickLang, relDays, setLang, t };

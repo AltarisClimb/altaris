@@ -56,6 +56,8 @@ export default {
   "g.days": "days",
   "g.ago": "",
   "g.language": "Language",
+  "g.langAuto": "Auto",
+  "g.langAutoD": "Follow the system language",
   "g.theme": "Theme",
   "g.signOut": "Sign out",
   "g.copy": "Copy",
