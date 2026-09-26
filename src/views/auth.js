@@ -2,7 +2,7 @@ import { $, esc, uid } from "../core.js";
 import { Session, Store, audit } from "../data.js";
 import { t } from "../i18n/index.js";
 import { body, loadExercises, render } from "../main.js";
-import { logo, topo } from "../ui/brand.js";
+import { topo } from "../ui/brand.js";
 import { Remote } from "../remote.js";
 import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
@@ -10,10 +10,8 @@ import { TABS, View, initials } from "./shell.js";
 /* ================================================================
    10. AUTH
    ================================================================ */
-function authHead(){
-  return '<div class="center stack sm">' + logo(46, { wordH: 34 }) +
-      '<p class="muted" style="font-size:14px;margin-top:6px">' + esc(t("app.tagline")) + '</p></div>' + topo();
-}
+/* Le logo est déjà dans la barre du haut : pas de second logo ni de slogan ici. */
+function authHead(){ return topo(); }
 
 /* ---------------- Supabase : e-mail + mot de passe ---------------- */
 function viewAuthRemote(){
@@ -143,9 +141,7 @@ function viewAuth(){
   const users = Store.list("users").filter(u => u.status !== "suspended");
   users.sort((a,b) => (a.role === b.role ? a.name.localeCompare(b.name) : (a.role === "admin" ? -1 : b.role === "admin" ? 1 : a.role === "coach" ? -1 : 1)));
   return '<main><div class="stack lg" style="max-width:520px;margin:22px auto 0">' +
-    '<div class="center stack sm">' + logo(46, { wordH: 34 }) +
-      '<p class="muted" style="font-size:14px;margin-top:6px">' + esc(t("app.tagline")) + '</p></div>' +
-    topo() +
+    authHead() +
     (users.length ? (
       '<div class="stack sm"><span class="eyebrow">' + esc(t("auth.title")) + '</span>' +
       '<p class="muted small">' + esc(t("auth.subtitle")) + '</p>' +

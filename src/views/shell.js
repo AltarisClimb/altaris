@@ -1,7 +1,7 @@
 import { APP_VERSION, COPYRIGHT, diffDays, esc, sum, today, weekStart } from "../core.js";
 import { Access, Session, Store } from "../data.js";
 import { alertsFor } from "../domain/workload.js";
-import { LANG_PREF, t } from "../i18n/index.js";
+import { t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
 import { logo } from "../ui/brand.js";
 import { ic } from "../ui/icons.js";
@@ -60,10 +60,6 @@ function topbar(){
     (me ? '<button class="home-link" data-act="home" title="' + esc(t("g.home")) + '" aria-label="' + esc(t("g.home")) + '">' + logo(19, { wordH: 15 }) + '</button>'
         : logo(19, { wordH: 15 })) +
     '<span class="spacer"></span>' +
-    '<div class="seg sm" role="group" aria-label="' + esc(t("g.language")) + '">' +
-      '<button data-act="lang" data-v="auto" class="' + (LANG_PREF==="auto"?"on":"") + '" title="' + esc(t("g.langAutoD")) + '">' + esc(t("g.langAuto")) + '</button>' +
-      '<button data-act="lang" data-v="fr" class="' + (LANG_PREF==="fr"?"on":"") + '">FR</button>' +
-      '<button data-act="lang" data-v="en" class="' + (LANG_PREF==="en"?"on":"") + '">EN</button></div>' +
     '<button class="btn icon sm ghost" data-act="theme" aria-label="' + esc(t("g.theme")) + '" title="' + esc(t("g.theme")) + '">' +
       ic(View.theme === "light" ? "moon" : "sun") + '</button>' +
     (me ? '<button class="btn sm ghost" data-act="signout" title="' + esc(t("g.signOut")) + '">' +

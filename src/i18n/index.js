@@ -26,21 +26,19 @@ function systemLang(){
   catch(e){ return FALLBACK; }
 }
 
-/* "auto" follows the system; "fr" / "en" is an explicit choice kept in localStorage. */
-let LANG_PREF = (function(){
-  try{ const st = localStorage.getItem("altaris.lang"); if (DICTS[st]) return st; }catch(e){}
-  return "auto";
-})();
-let LANG = LANG_PREF === "auto" ? systemLang() : LANG_PREF;
+/* La langue est toujours celle du téléphone ou de l'ordinateur : pas de choix
+   manuel. Un ancien choix enregistré (sélecteur FR/EN retiré) est effacé. */
+try{ localStorage.removeItem("altaris.lang"); }catch(e){}
+let LANG = systemLang();
 const LI = () => (LANG === "en" ? 1 : 0);
 
 function applyLang(){
-  LANG = LANG_PREF === "auto" ? systemLang() : LANG_PREF;
+  LANG = systemLang();
   try{ document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR"); }catch(e){}
   requestRender();
 }
 if (typeof window !== "undefined"){
-  window.addEventListener("languagechange", () => { if (LANG_PREF === "auto") applyLang(); });
+  window.addEventListener("languagechange", applyLang);
 }
 /** Traduit une clé. Repli sur le français puis sur la clé brute,
  *  pour qu'une clé manquante reste visible au lieu de rendre du vide. */
@@ -51,15 +49,6 @@ function t(key, vars){
   if (s == null) s = key;
   if (vars) for (const k in vars) s = s.replace(new RegExp("\\{" + k + "\\}", "g"), vars[k]);
   return s;
-}
-/** "auto" or a DICTS key. */
-function setLang(pref){
-  LANG_PREF = DICTS[pref] ? pref : "auto";
-  try{
-    if (LANG_PREF === "auto") localStorage.removeItem("altaris.lang");
-    else localStorage.setItem("altaris.lang", LANG_PREF);
-  }catch(e){}
-  applyLang();
 }
 /** locale-aware helpers */
 const LOC = () => (LANG === "en" ? "en-US" : "fr-FR");
@@ -74,4 +63,4 @@ function relDays(dateStr){
   return n > 0 ? "il y a " + n + " j" : "dans " + (-n) + " j";
 }
 
-export { DICTS, LANG, LANG_PREF, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, pickLang, relDays, setLang, t };
+export { DICTS, LANG, LI, LOC, fmtDate, fmtDateLong, fmtNum, fmtTime, pickLang, relDays, t };

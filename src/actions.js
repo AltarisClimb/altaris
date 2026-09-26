@@ -5,7 +5,7 @@ import { batteryFor, scoreAssessment } from "./domain/scoring.js";
 import { setExercises } from "./domain/exercises.js";
 import { exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
-import { fmtDate, fmtNum, setLang, t } from "./i18n/index.js";
+import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
 import { accountEditModal, availModal, blockEditor, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
@@ -18,7 +18,6 @@ import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
    23. ACTION DISPATCH
    ================================================================ */
 const ACTIONS = {
-  lang: (v) => setLang(v),
   theme: () => {
     View.theme = View.theme === "light" ? null : "light";
     if (View.theme) document.documentElement.setAttribute("data-theme", "light");

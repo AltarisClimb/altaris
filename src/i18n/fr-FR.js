@@ -2,7 +2,6 @@
    © 2026 ALTARIS™. All rights reserved.
    Fichier plat clé → chaîne : confiable à un traducteur tel quel. */
 export default {
-  "app.tagline": "Analyse de performance & entraînement d'escalade",
   "app.confidential": "Confidentiel & propriété exclusive",
   "app.version": "Version",
   "g.save": "Enregistrer",
@@ -55,10 +54,7 @@ export default {
   "g.noData": "Pas encore de données",
   "g.days": "jours",
   "g.ago": "il y a",
-  "g.language": "Langue",
   "g.home": "Accueil",
-  "g.langAuto": "Auto",
-  "g.langAutoD": "Suivre la langue du système",
   "g.theme": "Thème",
   "g.signOut": "Déconnexion",
   "g.copy": "Copier",
