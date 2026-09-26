@@ -10,7 +10,7 @@ import { topo } from "./ui/brand.js";
 import { Modal, toast } from "./ui/feedback.js";
 import { ic } from "./ui/icons.js";
 import { PAIN_SITES, kpi, painLabel } from "./views/climber.js";
-import { exerciseModal, getThread } from "./views/library.js";
+import { exerciseModal, sendMessage } from "./views/library.js";
 import { DAYS, SESSION_TYPES, fNum, fSelect } from "./views/onboarding.js";
 /* ================================================================
    20. MODALS — session sheet, RPE validation, block editor,
@@ -247,11 +247,9 @@ function painModal(){
         audit("pain_reported", site + " EVA" + eva);
         const coach = Access.myCoach();
         if (coach){
-          const th = getThread(me.id, coach.id);
-          const msgs = (th.messages||[]).concat([{ id: uid("m"), from: me.id, ts: Date.now(),
+          await sendMessage(me.id, coach.id, {
             ctx: t("pn.title"), text: painLabel(site) + " · " + t("pn.eva") + " " + eva + "/10 · " + t("pn.when."+$("#pn-when", root).value) +
-              ($("#pn-ctx", root).value.trim() ? "\n" + $("#pn-ctx", root).value.trim() : "") }]);
-          await Store.put("threads", th.id, Object.assign({}, th, { messages: msgs, updatedAt: Date.now() }));
+              ($("#pn-ctx", root).value.trim() ? "\n" + $("#pn-ctx", root).value.trim() : "") });
         }
         Modal.close();
         toast(t("pn.sent"), "good");

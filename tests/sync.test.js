@@ -86,3 +86,57 @@ test("les autres collections restent locales", async () => {
   await Store.put("pain", "p-1", { userId: ATH, eva: 3 });
   assert.deepEqual(calls, []);
 });
+
+/* ---------------- messagerie ---------------- */
+function useFakeMessaging(){
+  const rows = [], reads = [];
+  Remote.messages = async () => rows.slice();
+  Remote.reads = async () => reads.slice();
+  Remote.sendMessage = async (athlete_id, msg) => {
+    if (fail) throw fail;
+    const r = { id: "m" + rows.length, athlete_id, sender_id: Session.user.id, body: msg.text,
+                context: msg.ctx || null, video_url: msg.videoUrl || null, created_at: new Date().toISOString() };
+    rows.push(r);
+    return r;
+  };
+  Remote.markRead = async (athlete_id, ts) => { reads.push({ athlete_id, user_id: Session.user.id, last_read_at: new Date(ts).toISOString() }); };
+  return { rows, reads };
+}
+
+test("un message du grimpeur arrive dans la conversation que voit le coach", async () => {
+  const srv = useFakeMessaging();
+  Session.user = Store.data.users[ATH];
+  assert.equal(await Store.sendMessage(ATH, { text: "Bonjour coach" }), true);
+  Session.user = Store.data.users[COACH];
+  Store.data.threads = {};
+  await Store.syncMessages();
+  const th = Store.data.threads[ATH];
+  assert.equal(th.messages.length, 1);
+  assert.equal(th.messages[0].from, ATH);
+  assert.equal(th.messages[0].text, "Bonjour coach");
+  assert.equal(srv.rows.length, 1);
+});
+
+test("un message reçu en direct n'est pas affiché deux fois", async () => {
+  useFakeMessaging();
+  const row = { id: "live-1", athlete_id: ATH, sender_id: COACH, body: "Salut", created_at: new Date().toISOString() };
+  Store.addMessage(row);
+  Store.addMessage(row);
+  assert.equal(Store.data.threads[ATH].messages.length, 1);
+});
+
+test("échec d'envoi : rien n'est ajouté, l'appelant garde le brouillon", async () => {
+  useFakeMessaging();
+  fail = new TypeError("Failed to fetch");
+  assert.equal(await Store.sendMessage(ATH, { text: "hors ligne" }), false);
+  assert.equal((Store.data.threads[ATH] || { messages: [] }).messages.length, 0);
+});
+
+test("marquer comme lu enregistre mon marqueur, relu à la synchronisation", async () => {
+  const srv = useFakeMessaging();
+  await Store.markThreadRead(ATH, 1700000000000);
+  assert.equal(srv.reads.length, 1);
+  Store.data.threads = {};
+  await Store.syncMessages();
+  assert.equal(Store.data.threads[ATH].read[COACH], 1700000000000);
+});

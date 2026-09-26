@@ -132,8 +132,35 @@ select t.ok('admin sees every session', (select count(*) from athlete_docs) = 1)
 select t.ok('admin can delete a session', t.rows('delete from athlete_docs where id = ''s-1''') = 1);
 reset role;
 
+-- ================= messages
+-- Still: S1's coach is A (admin), S2's coach is T1, T2 is suspended.
+select t.as(:S2); set role authenticated;
+select t.ok('S2 writes to their coach', t.rows('insert into messages (athlete_id, body) values (' || quote_literal(:S2) || ', ''Bonjour coach'')') = 1);
+select t.ok('sender is stamped by the server', (select sender_id from messages where body = 'Bonjour coach') = :S2);
+select t.err('S2 cannot post in S1 conversation', 'insert into messages (athlete_id, body) values (' || quote_literal(:S1) || ', ''x'')');
+select t.ok('S2 posts with a forged sender_id', t.rows('insert into messages (athlete_id, sender_id, body) values (' || quote_literal(:S2) || ', ' || quote_literal(:T1) || ', ''spoof'')') = 1);
+select t.ok('  … and the stored sender is S2, not the coach', (select sender_id from messages where body = 'spoof') = :S2);
+select t.err('empty message rejected', 'insert into messages (athlete_id, body) values (' || quote_literal(:S2) || ', '''')');
+select t.ok('S2 cannot edit a message', t.rows('update messages set body = ''edited''') = 0);
+select t.ok('S2 cannot delete a message', t.rows('delete from messages') = 0);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('T1 reads S2 conversation', (select count(*) from messages where athlete_id = :S2) = 2);
+select t.ok('T1 replies', t.rows('insert into messages (athlete_id, body) values (' || quote_literal(:S2) || ', ''Salut'')') = 1);
+select t.ok('T1 marks S2 conversation read', t.rows('insert into message_reads (athlete_id, user_id, last_read_at) values (' || quote_literal(:S2) || ', ' || quote_literal(:T1) || ', now())') = 1);
+select t.err('T1 cannot mark read for someone else', 'insert into message_reads (athlete_id, user_id, last_read_at) values (' || quote_literal(:S2) || ', ' || quote_literal(:S2) || ', now())');
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('S1 sees nothing of S2 conversation', (select count(*) from messages) = 0);
+select t.ok('S1 does not see T1 read markers', (select count(*) from message_reads) = 0);
+reset role;
+select t.as(:T2); set role authenticated;
+select t.ok('suspended T2 sees no messages', (select count(*) from messages) = 0);
+reset role;
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');
 select t.err('anon cannot read sessions', 'select count(*) from athlete_docs');
+select t.err('anon cannot read messages', 'select count(*) from messages');
 reset role;

@@ -1,4 +1,4 @@
-import { $, $$, addDays, byId, esc } from "../core.js";
+import { $, $$, addDays, byId, esc, uid } from "../core.js";
 import { Access, Session, Store, audit, config } from "../data.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
@@ -171,12 +171,30 @@ function exerciseModal(id){
    16. MESSAGING
    ================================================================ */
 function threadId(a, b){ return [a, b].sort().join("__"); }
+/* En mode Supabase, une conversation par grimpeur, partagée par son coach et
+   les admins : on la retrouve par l'id du grimpeur, quel que soit l'encadrant. */
+function athleteOf(a, b){ const ua = Store.get("users", a); return ua && ua.role === "climber" ? a : b; }
 function getThread(a, b){
+  if (Remote.client){
+    const id = athleteOf(a, b);
+    return Store.get("threads", id) || { id, athleteId: id, participants: [id], messages: [], read: {} };
+  }
   const id = threadId(a, b);
   return Store.get("threads", id) || { id, participants: [a, b], messages: [], read: {} };
 }
+/** Envoie un message de from à to. msg = { text, ctx?, videoUrl? }. Renvoie false en cas d'échec. */
+async function sendMessage(from, to, msg){
+  if (Remote.client) return Store.sendMessage(athleteOf(from, to), msg);
+  const th = getThread(from, to);
+  const msgs = (th.messages||[]).concat([Object.assign({ id: uid("m"), from, ts: Date.now() }, msg)]);
+  await Store.put("threads", th.id, Object.assign({}, th, { messages: msgs, updatedAt: Date.now() }));
+  return true;
+}
 function unreadCount(userId){
-  return Store.list("threads").filter(th => (th.participants||[]).indexOf(userId) >= 0)
+  const mine = Remote.client
+    ? (th) => th.athleteId && (th.athleteId === userId || Access.canSee(th.athleteId))
+    : (th) => (th.participants||[]).indexOf(userId) >= 0;
+  return Store.list("threads").filter(mine)
     .reduce((n, th) => {
       const last = (th.read || {})[userId] || 0;
       return n + (th.messages || []).filter(m => m.from !== userId && m.ts > last).length;
@@ -187,6 +205,7 @@ async function markRead(th, userId){
   const lastTs = (th.messages || []).reduce((m, x) => Math.max(m, x.ts), 0);
   if ((read[userId] || 0) >= lastTs) return;
   read[userId] = lastTs;
+  if (Remote.client) return Store.markThreadRead(th.athleteId || th.id, lastTs);
   await Store.put("threads", th.id, Object.assign({}, th, { read }));
 }
 
@@ -308,4 +327,4 @@ function rw(k, v){
     '<span class="v">' + esc(v) + '</span></div>';
 }
 
-export { exerciseModal, getThread, markRead, rw, threadId, unreadCount, viewExercises, viewMessages, viewProfile };
+export { exerciseModal, getThread, markRead, rw, sendMessage, threadId, unreadCount, viewExercises, viewMessages, viewProfile };

@@ -16,6 +16,11 @@ const REMOTE_COLS = ["sessions"];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Ligne athlete_docs → document de l'application. */
 function fromDocRow(r){ return Object.assign({}, r.data, { id: r.id, userId: r.athlete_id }); }
+/** Ligne messages → message de l'application. */
+function fromMessageRow(r){
+  return { id: r.id, from: r.sender_id, ts: Date.parse(r.created_at), text: r.body,
+           ctx: r.context || null, videoUrl: r.video_url || null };
+}
 /** Réseau coupé (à réessayer) plutôt que refus du serveur (définitif). */
 function isNetworkError(e){
   return !e || e instanceof TypeError || !e.code || /fetch|network/i.test(e.message || "");
@@ -193,21 +198,57 @@ const Store = {
         .forEach(q => { if (q.op === "del") delete next[q.id]; else next[q.id] = q.doc; });
       this.data[col] = next;
     }
+    await this.syncMessages();
     this.saveLocal();
     requestRender();
+  },
+
+  /* ---------- messagerie ----------
+     En mode Supabase, "threads" contient une conversation par grimpeur (id =
+     id du grimpeur), reconstruite depuis la table messages. Seuls mes
+     marqueurs de lecture sont connus : read = { [moi]: ts }. */
+  async syncMessages(){
+    let rows, reads;
+    try{ [rows, reads] = await Promise.all([Remote.messages(), Remote.reads()]); }
+    catch(e){ return; }                                                  // hors ligne : on garde le cache
+    this.data.threads = {};
+    rows.forEach(r => this.addMessage(r, true));
+    reads.forEach(r => { this._thread(r.athlete_id).read[r.user_id] = Date.parse(r.last_read_at); });
+  },
+  _thread(athleteId){
+    this.data.threads = this.data.threads || {};
+    return this.data.threads[athleteId] ||
+      (this.data.threads[athleteId] = { id: athleteId, athleteId, participants: [athleteId], messages: [], read: {} });
+  },
+  /** Ajoute une ligne messages à sa conversation (ignorée si déjà présente). */
+  addMessage(r, quiet){
+    const th = this._thread(r.athlete_id);
+    if (th.messages.some(m => m.id === r.id)) return;
+    th.messages.push(fromMessageRow(r));
+    if (!quiet){ this.saveLocal(); if (!this.silent) requestRender(); }
+  },
+  async sendMessage(athleteId, msg){
+    try{ this.addMessage(await Remote.sendMessage(athleteId, msg)); return true; }
+    catch(e){ toast(t(isNetworkError(e) ? "er.offline" : "er.saveFailed"), "crit"); return false; }
+  },
+  async markThreadRead(athleteId, ts){
+    const th = this._thread(athleteId);
+    th.read[Session.user.id] = ts;
+    this.saveLocal();
+    try{ await Remote.markRead(athleteId, ts); }catch(e){ /* sera recalculé à la prochaine synchro */ }
   },
 
   /** Synchronisation + changements en direct. Appelé après chaque connexion. */
   startRemote(){
     if (!Remote.client) return;
     this.syncRemote();
-    Remote.watchDocs((col, id, row) => {
+    Remote.watch((col, id, row) => {
       if (!REMOTE_COLS.includes(col)) return;
       this.data[col] = this.data[col] || {};
       if (row) this.data[col][id] = fromDocRow(row); else delete this.data[col][id];
       this.saveLocal();
       if (!this.silent) requestRender();
-    });
+    }, (row) => this.addMessage(row));
   },
 
   _enqueue(item){
@@ -348,4 +389,4 @@ const Access = {
   }
 };
 
-export { Access, COLS, DEFAULT_CONFIG, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, isNetworkError, touch };
+export { Access, COLS, DEFAULT_CONFIG, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, fromMessageRow, isNetworkError, touch };

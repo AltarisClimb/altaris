@@ -11,7 +11,7 @@ import { accountEditModal, availModal, blockEditor, legalModal, painModal, profi
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
-import { exerciseModal, getThread } from "./views/library.js";
+import { exerciseModal, sendMessage } from "./views/library.js";
 import { View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
 /* ================================================================
@@ -75,10 +75,9 @@ const ACTIONS = {
     const text = (View.msgDraft || "").trim();
     const url = ($("#msg-video") && $("#msg-video").value.trim()) || "";
     if (!text && !url) return;
-    const th = getThread(me.id, v);
-    const msgs = (th.messages||[]).concat([{ id: uid("m"), from: me.id, ts: Date.now(), text: text || t("ex.video"), videoUrl: url || null }]);
+    if (!await sendMessage(me.id, v, { text: text || t("ex.video"), videoUrl: url || null })) return;   // brouillon conservé
     View.msgDraft = "";
-    await Store.put("threads", th.id, Object.assign({}, th, { messages: msgs, updatedAt: Date.now() }));
+    render();
     audit("message_sent", v);
   },
   /* --- onboarding --- */

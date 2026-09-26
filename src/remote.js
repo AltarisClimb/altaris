@@ -147,15 +147,45 @@ const Remote = {
     const { error } = await this.client.from("athlete_docs").delete().eq("col", col).eq("id", id);
     if (error) throw error;
   },
-  /** Changements en direct (Realtime applique la même RLS). onChange(col, id, row|null). */
-  watchDocs(onChange){
+  /** Changements en direct (Realtime applique la même RLS).
+   *  onDoc(col, id, row|null) pour athlete_docs, onMessage(row) pour chaque nouveau message. */
+  watch(onDoc, onMessage){
     this.client.removeAllChannels();
-    this.client.channel("athlete_docs")
+    this.client.channel("live")
       .on("postgres_changes", { event: "*", schema: "public", table: "athlete_docs" }, (p) => {
-        if (p.eventType === "DELETE") onChange(p.old.col, p.old.id, null);
-        else onChange(p.new.col, p.new.id, p.new);
+        if (p.eventType === "DELETE") onDoc(p.old.col, p.old.id, null);
+        else onDoc(p.new.col, p.new.id, p.new);
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onMessage(p.new))
       .subscribe();
+  },
+
+  /* ---------- messagerie (tables messages, message_reads) ---------- */
+  async messages(){
+    const { data, error } = await this.client.from("messages")
+      .select("id, athlete_id, sender_id, body, context, video_url, created_at")
+      .order("created_at").limit(5000);
+    if (error) throw error;
+    return data;
+  },
+  /** Mes marqueurs de lecture (la RLS ne renvoie que les miens). */
+  async reads(){
+    const { data, error } = await this.client.from("message_reads").select("athlete_id, user_id, last_read_at");
+    if (error) throw error;
+    return data;
+  },
+  async sendMessage(athleteId, msg){
+    const { data, error } = await this.client.from("messages")
+      .insert({ athlete_id: athleteId, body: msg.text, context: msg.ctx || null, video_url: msg.videoUrl || null })
+      .select("id, athlete_id, sender_id, body, context, video_url, created_at").single();
+    if (error) throw error;
+    return data;
+  },
+  async markRead(athleteId, ts){
+    const user_id = await this.userId();
+    const { error } = await this.client.from("message_reads")
+      .upsert({ athlete_id: athleteId, user_id, last_read_at: new Date(ts).toISOString() }, { onConflict: "athlete_id,user_id" });
+    if (error) throw error;
   },
 
   async updateProfile(id, patch){
