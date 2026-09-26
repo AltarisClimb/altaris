@@ -2,7 +2,9 @@ import { $, $$, addDays, clamp, esc, today, uid, weekStart } from "./core.js";
 import { Access, Session, Store, audit, config } from "./data.js";
 import { trackFor } from "./domain/grades.js";
 import { batteryFor, scoreAssessment } from "./domain/scoring.js";
+import { setExercises } from "./domain/exercises.js";
 import { exportPayload, saveFile } from "./export.js";
+import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, setLang, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
 import { accountEditModal, availModal, blockEditor, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal } from "./modals.js";
@@ -24,7 +26,7 @@ const ACTIONS = {
     try{ View.theme ? localStorage.setItem("altaris.theme", "light") : localStorage.removeItem("altaris.theme"); }catch(e){}
     render();
   },
-  signout: () => { View.tab = null; View.athlete = null; Session.signOut(); },
+  signout: () => { View.tab = null; View.athlete = null; if (Remote.client) setExercises([]); Session.signOut(); },
   tab: (v) => { View.tab = v; View.athlete = null; window.scrollTo(0,0); render(); },
   legal: () => legalModal(),
   print: () => window.print(),

@@ -1,6 +1,7 @@
 import { setRenderer } from "./bus.js";
 import { $ } from "./core.js";
 import { Session, Store } from "./data.js";
+import { fromRow, setExercises } from "./domain/exercises.js";
 import { LANG, t } from "./i18n/index.js";
 import { Remote } from "./remote.js";
 import { toast } from "./ui/feedback.js";
@@ -78,16 +79,36 @@ function onAuthEvent(event){
   if (event === "PASSWORD_RECOVERY") render();
 }
 
+/* Bibliothèque d'exercices depuis Supabase, avec une copie par utilisateur
+   pour le mode hors ligne (au pied du mur, sans réseau). */
+async function loadExercises(){
+  if (!Remote.client || !Session.user) return;
+  const key = "altaris.exercises." + Session.user.id;
+  try{
+    const rows = await Remote.exercises();
+    setExercises(rows.map(fromRow));
+    try{ localStorage.setItem(key, JSON.stringify(rows)); }catch(e){}
+  }catch(e){
+    try{ const rows = JSON.parse(localStorage.getItem(key) || "null"); if (rows) setExercises(rows.map(fromRow)); }catch(e2){}
+  }
+  render();
+}
+
 /* boot */
 (async function boot(){
   document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR");
   await Store.init();
   if (Remote.enabled()){
+    setExercises([]);                    // la bibliothèque vient du serveur, pas de la banque intégrée
     try{
       await Remote.init(onAuthEvent);
+      const link = await Remote.consumeEmailLink();
+      if (link === "confirmed") toast(t("auth.emailConfirmed"), "good");
+      if (link === "expired") toast(t("auth.linkExpired"), "crit");
       if (await Session.restoreRemote() === "suspended") toast(t("auth.suspended"), "crit");
     }catch(e){ toast(t("auth.remoteDown"), "crit"); }
     Remote.booting = false;
+    loadExercises();
   } else {
     Session.restore();
   }
@@ -108,4 +129,4 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
 /* render() est le point d'entrée du rendu : data.js, actions.js et les vues
    l'appellent toutes. Les déclarations de fonction étant hoistées, le cycle
    d'imports qui en résulte est résolu par le moteur de modules. */
-export { _rt, body, render, renderDebounced };
+export { _rt, body, loadExercises, render, renderDebounced };

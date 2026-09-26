@@ -4,9 +4,28 @@ import { LI } from "../i18n/index.js";
    5. ALTARIS EXERCISE BANK — bilingual reference library
    Fields are "FR|EN". lv: all / inter / adv (minimum level)
    ================================================================ */
-const EX_CATS = ["finger","power","endur","boulder","mobility","core","prehab"];
+const EX_CATS = ["doigts","tirage","poussee","gainage","antagonistes","pliometrie","endurance",
+                 "mobilite","equilibre","vitesse","echauffement","recuperation"];
+
+/* Exercices de cette banque remplacés par un équivalent de la base v2
+   (supabase/migrations/…_exercise_bank_v2.sql). Ils ne sont plus publiés,
+   mais une séance déjà planifiée avec l'ancien id retrouve le nouveau. */
+const REPLACED = {
+  "fg-maxhang":"fd03", "fg-repeaters":"fd02", "fg-pinch":"fd04", "fg-jug":"fd01", "ph-passive":"fd01",
+  "pw-campus":"fd05", "pw-dyno":"pl01", "pw-explopull":"ft07", "pw-jumpsquat":"pl03",
+  "en-4x4":"en02", "en-arc":"en01", "en-laps":"en03", "en-circuit":"en06",
+  "bd-silent":"eq01", "bd-downclimb":"en07",
+  "mb-frog":"mo02", "mb-split":"mo03", "mb-ankle":"mo07",
+  "cr-hollow":"ga03", "cr-fl":"ft05", "cr-legraise":"ga04", "cr-sideplank":"ga02", "cr-dragon":"ga05",
+  "ph-erot":"an01", "ph-ytw":"an03", "ph-tyler":"an07", "ph-wrist":"an04", "ph-serratus":"an05"
+};
+/* Anciennes catégories → catégories v2 ; quelques exercices sont reclassés un par un. */
+const CAT_V2 = { finger:"doigts", power:"pliometrie", endur:"endurance", boulder:"equilibre",
+                 mobility:"mobilite", core:"gainage", prehab:"antagonistes" };
+const CAT_V2_BY_ID = { "pw-wpull":"tirage" };
+
 const _X = [];
-function X(id,cat,lv,n,d,m,c,e,dose,contra){ _X.push({id,cat,lv,n,d,m,c,e,dose,contra}); }
+function X(id,cat,lv,n,d,m,c,e,dose,contra){ _X.push({id,cat:CAT_V2_BY_ID[id]||CAT_V2[cat],lv,n,d,m,c,e,dose,contra}); }
 
 /* ---------- Force doigts ---------- */
 X("fg-maxhang","finger","adv",
@@ -573,12 +592,41 @@ X("ph-pulley","prehab","inter",
 "5 × 10 s, tous les 2 jours, sous supervision d'un professionnel de santé.|5 × 10 s, every 2 days, supervised by a healthcare professional.",
 "Phase aiguë (moins de 3 semaines), œdème, craquement initial audible sans avis médical.|Acute phase (under 3 weeks), swelling, an initial audible pop without medical review.");
 
-const EXERCISES = _X;
+/* La bibliothèque affichée. En mode local c'est la banque intégrée ; en mode
+   Supabase, setExercises() la remplace par ce que la RLS laisse voir.
+   Le tableau est modifié en place : les modules qui l'importent suivent. */
+const EXERCISES = _X.slice();             // mode local : toute la banque intégrée
+function setExercises(list){ EXERCISES.length = 0; list.forEach(e => EXERCISES.push(e)); }
+
+/** Ligne de la table exercises → forme "FR|EN" utilisée par les vues. */
+function fromRow(r){
+  const tt = r.title || {}, fr = (r.content || {}).fr || {}, en = (r.content || {}).en || {};
+  const pair = (k) => (fr[k] || "") + "|" + (en[k] || fr[k] || "");
+  return {
+    id: r.slug || r.id, uuid: r.id, cat: r.category, lv: r.level || "all",
+    n: (tt.fr || "") + "|" + (tt.en || tt.fr || ""),
+    d: pair("description"), m: pair("muscles"), c: pair("cues"), e: pair("errors"),
+    dose: pair("dose"), contra: pair("contraindications"),
+    video: r.video_url || null, visibility: r.visibility,
+    meta: (r.content || {}).meta || null,
+    extra: { fr, en },                    // sous-catégorie, matériel… (base v2)
+    variants: [fr.variants || [], en.variants || []]
+  };
+}
+
 const exName = (e) => e.n.split("|")[LI()];
 const exField = (e, f) => (e[f] || "|").split("|")[LI()];
-const exById  = (id) => EXERCISES.find(e => e.id === id);
-/** Coach-supplied video URLs live in config so the library itself stays static. */
-function exVideo(id){ const v = Store.get("config", "videos") || {}; return v[id] || null; }
+/* Repli sur la banque intégrée : une séance déjà planifiée garde son libellé
+   même si l'exercice n'est pas (ou plus) visible dans la bibliothèque. */
+const exById  = (id) => EXERCISES.find(e => e.id === id)
+  || (REPLACED[id] && EXERCISES.find(e => e.id === REPLACED[id]))
+  || _X.find(e => e.id === id);
+/** Video: the database value wins; otherwise the coach-supplied URL kept in config. */
+function exVideo(id){
+  const e = EXERCISES.find(x => x.id === id);
+  if (e && e.video) return e.video;
+  const v = Store.get("config", "videos") || {}; return v[id] || null;
+}
 async function setExVideo(id, url){
   const v = Object.assign({}, Store.get("config", "videos") || {});
   if (url) v[id] = url; else delete v[id];
@@ -589,4 +637,4 @@ async function setExVideo(id, url){
 const EX_LV_LB = { all:["Tous niveaux","All levels"], inter:["Intermédiaire +","Intermediate +"], adv:["Avancé / Expert","Advanced / Expert"] };
 const EX_LV_COLOR = { all:"var(--good)", inter:"var(--warn)", adv:"var(--crit)" };
 
-export { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, X, _X, exById, exField, exName, exVideo, setExVideo };
+export { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, REPLACED, X, _X, exById, exField, exName, exVideo, fromRow, setExVideo, setExercises };

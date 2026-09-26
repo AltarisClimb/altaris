@@ -9,7 +9,7 @@ import { acwrSeries, progressLines, radarChart, sparkline, workloadChart } from 
 import { ic } from "../ui/icons.js";
 import { kpi, painLabel, sessionsOf, viewCalendar } from "./climber.js";
 import { INJURY_SITES } from "./onboarding.js";
-import { View, initials } from "./shell.js";
+import { View, initials, isStaff } from "./shell.js";
 /* ================================================================
    18. COACH COMMAND CENTER
    ================================================================ */
@@ -203,7 +203,7 @@ function viewAccounts(){
 }
 
 function viewPairings(){
-  const coaches = Store.list("users").filter(u => u.role === "coach" && u.status !== "suspended");
+  const coaches = Store.list("users").filter(u => isStaff(u) && u.status !== "suspended");
   const climbers = Store.list("users").filter(u => u.role === "climber" && u.status !== "suspended");
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("role.admin.portal")) + '</span>' +

@@ -340,7 +340,7 @@ function profileEditModal(){
 
 function accountEditModal(id){
   const u = Store.get("users", id); if (!u) return;
-  const coaches = Store.list("users").filter(x => x.role === "coach");
+  const coaches = Store.list("users").filter(x => x.role === "coach" || x.role === "admin");
   /* En mode Supabase, l'e-mail appartient à Supabase Auth et il n'y a pas de PIN. */
   const remote = !!Remote.client;
   Modal.open({

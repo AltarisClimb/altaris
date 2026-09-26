@@ -29,9 +29,15 @@ const TABS = {
             ["exercises","nav.exercises","book"],["messages","nav.messages","chat"],["profile","nav.profile","user"]],
   coach:   [["athletes","nav.athletes","users"],["planning","nav.planning","cal"],["exercises","nav.exercises","book"],
             ["messages","nav.messages","chat"],["profile","nav.profile","user"]],
-  admin:   [["accounts","nav.accounts","users"],["pairings","nav.pairings","shield"],["params","nav.params","gear"],
-            ["audit","nav.audit","list"],["exercises","nav.exercises","book"],["profile","nav.profile","user"]]
+  /* L'admin est un coach avec des super-pouvoirs : tous les onglets coach
+     (sur tous les grimpeurs), plus la gestion de la plateforme. */
+  admin:   [["athletes","nav.athletes","users"],["planning","nav.planning","cal"],["exercises","nav.exercises","book"],
+            ["messages","nav.messages","chat"],["accounts","nav.accounts","user"],["pairings","nav.pairings","shield"],
+            ["params","nav.params","gear"],["audit","nav.audit","list"],["profile","nav.profile","user"]]
 };
+
+/** Coach ou admin : tout ce qui relève de l'encadrement. */
+function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
 
 function tabBadge(id){
   const me = Session.live(); if (!me) return 0;
@@ -39,7 +45,7 @@ function tabBadge(id){
     if (id === "overview") return Store.list("sessions").filter(s => s.userId === me.id && s.status === "planned" && diffDays(today(), s.date) >= 0).length;
     if (id === "messages") return unreadCount(me.id);
   }
-  if (me.role === "coach"){
+  if (isStaff(me)){
     if (id === "athletes") return sum(Access.climbers().map(c => alertsFor(c.id).filter(a => a.sev === "crit").length));
     if (id === "messages") return unreadCount(me.id);
   }
@@ -97,4 +103,4 @@ function watermark(){
   return '<div class="wmark" aria-hidden="true">' + s + '</div>';
 }
 
-export { TABS, View, initials, legalFooter, tabBadge, tabsBar, topbar, watermark };
+export { TABS, View, initials, isStaff, legalFooter, tabBadge, tabsBar, topbar, watermark };

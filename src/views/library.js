@@ -8,8 +8,9 @@ import { body } from "../main.js";
 import { topo } from "../ui/brand.js";
 import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
+import { exercisePose, variantPose } from "../ui/poses.js";
 import { painLabel } from "./climber.js";
-import { View } from "./shell.js";
+import { View, isStaff } from "./shell.js";
 /* ================================================================
    15. EXERCISE BANK
    ================================================================ */
@@ -28,9 +29,9 @@ function viewExercises(){
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ex.title")) + '</span>' +
       '<h2>' + EXERCISES.length + ' ' + esc(t("ex.count")) + '</h2>' +
       '<p>' + esc(t("ex.videoNone")) + '</p></div>' +
-      (me && me.role === "coach" ? '<button class="btn sm pri noprint" data-act="routine-new">' + ic("plus") + esc(t("ex.newRoutine")) + '</button>' : '') + '</div>' +
+      (isStaff(me) ? '<button class="btn sm pri noprint" data-act="routine-new">' + ic("plus") + esc(t("ex.newRoutine")) + '</button>' : '') + '</div>' +
 
-    (me && me.role === "coach" && routines.length ? '<div class="panel pad stack sm">' +
+    (isStaff(me) && routines.length ? '<div class="panel pad stack sm">' +
       '<span class="eyebrow">' + esc(t("ex.routines")) + '</span>' +
       '<div class="row tight">' + routines.map(r =>
         '<span class="chip acc">' + esc(r.name) + ' · ' + (r.exerciseIds||[]).length +
@@ -55,6 +56,7 @@ function viewExercises(){
 
     (list.length ? '<div class="grid g2">' + list.map(e =>
       '<button class="excard" data-act="ex-open" data-v="' + esc(e.id) + '">' +
+        (exercisePose(e.meta) ? '<span class="exfig">' + exercisePose(e.meta) + '</span>' : '') +
         '<span class="eh"><span class="lvdot" style="background:' + EX_LV_COLOR[e.lv] + '"></span>' +
           '<span class="en">' + esc(exName(e)) + '</span>' +
           (exVideo(e.id) ? '<span style="color:var(--accent);flex:none">' + ic("video") + '</span>' : '') + '</span>' +
@@ -73,23 +75,39 @@ function exerciseModal(id){
   const vid = exVideo(id);
   const sec = (lb, val) => val ? '<div class="stack sm" style="gap:3px"><span class="eyebrow">' + esc(lb) + '</span>' +
     '<p class="small muted" style="line-height:1.6">' + esc(val) + '</p></div>' : "";
+  /* Champs de la base v2 : absents des exercices de la banque intégrée. */
+  const lc = LI() ? "en" : "fr";
+  const meta = e.meta || {};
+  const extra = (e.extra || {})[lc] || {};
+  const variants = (e.variants || [])[LI()] || [];
+  const fig = exercisePose(e.meta);
   Modal.open({
     title: exName(e), wide: true,
     body: '<div class="stack">' +
       '<div class="row tight"><span class="chip acc">' + esc(t("ex.cat."+e.cat)) + '</span>' +
-        '<span class="chip"><span class="lvdot" style="background:' + EX_LV_COLOR[e.lv] + ';margin:0"></span>' + esc(EX_LV_LB[e.lv][LI()]) + '</span></div>' +
+        '<span class="chip"><span class="lvdot" style="background:' + EX_LV_COLOR[e.lv] + ';margin:0"></span>' + esc(EX_LV_LB[e.lv][LI()]) + '</span>' +
+        (extra.subcategory ? '<span class="chip">' + esc(extra.subcategory) + '</span>' : '') +
+        (meta.duration ? '<span class="chip">' + ic("clock") + esc(meta.duration + " min") + '</span>' : '') + '</div>' +
+      (fig ? '<div class="exfig lg">' + fig + '</div>' : '') +
       '<p style="font-size:15px;line-height:1.6">' + esc(exField(e, "d")) + '</p>' +
       topo() +
+      sec(t("ex.equipment"), (extra.equipment || []).join(", ")) +
       sec(t("ex.muscles"), exField(e, "m")) +
       sec(t("ex.cues"), exField(e, "c")) +
       sec(t("ex.mistakes"), exField(e, "e")) +
       sec(t("ex.dosage"), exField(e, "dose")) +
+      (variants.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("ex.variants")) + '</span>' +
+        variants.map((v, i) => '<div class="exvar">' +
+          (variantPose(e.meta, i) ? '<span class="exfig">' + variantPose(e.meta, i) + '</span>' : '<span></span>') +
+          '<div class="stack sm" style="gap:2px"><b class="small">' + (i + 1) + '. ' + esc(v.name) + '</b>' +
+          '<p class="small muted" style="line-height:1.5">' + esc(v.desc) + '</p></div></div>').join("") +
+      '</div>' : '') +
       '<div class="stripe crit stack sm" style="gap:3px"><span class="eyebrow">' + esc(t("ex.contra")) + '</span>' +
         '<p class="small muted" style="line-height:1.6">' + esc(exField(e, "contra")) + '</p></div>' +
       '<div class="stack sm"><span class="eyebrow">' + esc(t("ex.video")) + '</span>' +
         (vid ? '<a class="btn sm" href="' + esc(vid) + '" target="_blank" rel="noopener noreferrer">' + ic("video") + esc(t("g.open")) + '</a>'
              : '<p class="dim tiny">' + esc(t("ex.videoNone")) + '</p>') +
-        (me && (me.role === "coach" || me.role === "admin") ?
+        (isStaff(me) ?
           '<span class="unit"><input class="inp" id="exv" placeholder="https://…" value="' + esc(vid||"") + '">' +
           '<button class="u" id="exv-save" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("g.save")) + '</button></span>' : '') +
       '</div>' +

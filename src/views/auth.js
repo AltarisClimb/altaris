@@ -1,7 +1,7 @@
 import { $, esc, uid } from "../core.js";
 import { Session, Store, audit } from "../data.js";
 import { t } from "../i18n/index.js";
-import { body, render } from "../main.js";
+import { body, loadExercises, render } from "../main.js";
 import { logo, topo } from "../ui/brand.js";
 import { Remote } from "../remote.js";
 import { Modal, toast } from "../ui/feedback.js";
@@ -65,6 +65,7 @@ async function remoteSignIn(){
 
 function enter(u){
   Session.signIn(u);
+  loadExercises();
   View.tab = TABS[u.role][0][0];
   render();
 }

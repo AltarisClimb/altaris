@@ -33,7 +33,7 @@ update profiles set role = 'admin'   where id = :A;
 update profiles set role = 'teacher' where id in (:T1, :T2);
 update profiles set teacher_id = :T1 where id = :S1;
 update profiles set teacher_id = :T2 where id = :S2;
-update exercises set visibility = 'free' where slug = 'fg-maxhang';
+update exercises set visibility = 'free' where slug = 'fd03';
 
 -- ================= student S1
 select t.as(:S1); set role authenticated;
@@ -51,7 +51,7 @@ reset role;
 select t.as(:T1); set role authenticated;
 select t.ok('T1 sees self + S1 only', (select count(*) from profiles) = 2
   and exists (select 1 from profiles where id = :S1) and not exists (select 1 from profiles where id = :S2));
-select t.ok('T1 sees whole library (62)', (select count(*) from exercises) = 62);
+select t.ok('T1 sees whole library (116)', (select count(*) from exercises) = 116);
 insert into exercises (author_id, visibility, title) values (:T1, 'library', '{"fr":"T1 new"}');
 select t.ok('T1 added an exercise to the library', exists (select 1 from exercises where title->>'fr' = 'T1 new'));
 select t.err('private visibility no longer exists', 'insert into exercises (author_id, visibility, title) values (' || quote_literal(:T1) || ', ''private'', ''{}'')');
@@ -61,8 +61,8 @@ select t.ok('T1 cannot flip own exercise to free', t.err('x', 'update exercises 
 insert into assignments (exercise_id, student_id, assigned_by)
   select id, :S1, :T1 from exercises where title->>'fr' = 'T1 new';
 select t.ok('T1 assigned exercise to S1', (select count(*) from assignments) = 1);
-select t.err('T1 cannot assign to S2 (not theirs)', 'insert into assignments (exercise_id, student_id, assigned_by) select id, ' || quote_literal(:S2) || ', ' || quote_literal(:T1) || ' from exercises where slug = ''fg-repeaters''');
-select t.ok('T1 cannot edit library exercise it did not author', t.rows('update exercises set level = ''x'' where slug = ''fg-repeaters''') = 0);
+select t.err('T1 cannot assign to S2 (not theirs)', 'insert into assignments (exercise_id, student_id, assigned_by) select id, ' || quote_literal(:S2) || ', ' || quote_literal(:T1) || ' from exercises where slug = ''fd02''');
+select t.ok('T1 cannot edit library exercise it did not author', t.rows('update exercises set level = ''x'' where slug = ''fd02''') = 0);
 select t.ok('T1 cannot grab S2 (not theirs)', t.rows('update profiles set teacher_id = ' || quote_literal(:T1) || ' where id = ' || quote_literal(:S2)) = 0);
 select t.ok('T1 cannot unpair own student S1', t.rows('update profiles set teacher_id = null where id = ' || quote_literal(:S1)) = 0);
 reset role;
@@ -84,11 +84,11 @@ reset role;
 -- ================= admin
 select t.as(:A); set role authenticated;
 select t.ok('admin sees all profiles', (select count(*) from profiles) = 5);
-select t.ok('admin sees all 63 exercises', (select count(*) from exercises) = 63);
+select t.ok('admin sees all 117 exercises', (select count(*) from exercises) = 117);
 select t.ok('admin re-pairs S2 to T1', t.rows('update profiles set teacher_id = ' || quote_literal(:T1) || ' where id = ' || quote_literal(:S2)) = 1);
 select t.err('pairing to a non-teacher is rejected', 'update profiles set teacher_id = ' || quote_literal(:S1) || ' where id = ' || quote_literal(:S2));
 select t.err('a teacher cannot have a teacher', 'update profiles set teacher_id = ' || quote_literal(:T1) || ' where id = ' || quote_literal(:T2));
-select t.ok('admin can publish free content', t.rows('update exercises set visibility = ''free'' where slug = ''fg-repeaters''') = 1);
+select t.ok('admin can publish free content', t.rows('update exercises set visibility = ''free'' where slug = ''fd02''') = 1);
 select t.ok('admin suspends T2', t.rows('update profiles set status = ''suspended'' where id = ' || quote_literal(:T2)) = 1);
 reset role;
 
@@ -98,6 +98,14 @@ select t.ok('T1 now sees S2 too', (select count(*) from profiles) = 3);
 reset role;
 select t.as(:T2); set role authenticated;
 select t.ok('suspended T2 loses library access (free only)', (select count(*) from exercises) = 2);
+reset role;
+
+-- ================= admin as coach
+select t.as(:A); set role authenticated;
+select t.ok('a student can be paired to an admin', t.rows('update profiles set teacher_id = ' || quote_literal(:A) || ' where id = ' || quote_literal(:S1)) = 1);
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('S1 sees own profile + admin coach', (select count(*) from profiles) = 2);
 reset role;
 
 -- ================= anon

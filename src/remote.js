@@ -71,6 +71,21 @@ const Remote = {
     return this.client;
   },
 
+  /** Lien reçu par e-mail (?token_hash=…&type=…) : la vérification se fait ici,
+   *  sur le site, pas sur supabase.co. Renvoie "confirmed", "recovery",
+   *  "expired" ou null s'il n'y a pas de lien dans l'adresse. */
+  async consumeEmailLink(){
+    const q = new URLSearchParams(location.search);
+    const token_hash = q.get("token_hash"), type = q.get("type");
+    if (!token_hash || !type) return null;
+    /* Le jeton ne sert qu'une fois : on le retire de l'adresse tout de suite. */
+    history.replaceState(null, "", location.pathname + location.hash);
+    const { error } = await this.client.auth.verifyOtp({ token_hash, type });
+    if (error) return "expired";
+    if (type === "recovery"){ this.recovery = true; return "recovery"; }
+    return "confirmed";
+  },
+
   async userId(){
     const { data } = await this.client.auth.getSession();
     return data.session ? data.session.user.id : null;
@@ -82,6 +97,16 @@ const Remote = {
       .select("id, email, full_name, role, status, teacher_id, created_at");
     if (error) throw error;
     return data.map(fromProfile);
+  },
+
+  /** Exercices visibles (RLS) : free pour tous, library pour coachs/admins,
+   *  et pour un grimpeur ceux qui lui sont assignés. Lignes brutes. */
+  async exercises(){
+    const { data, error } = await this.client.from("exercises")
+      .select("id, slug, visibility, category, level, title, content, video_url")
+      .order("category").order("slug");
+    if (error) throw error;
+    return data;
   },
 
   async updateProfile(id, patch){

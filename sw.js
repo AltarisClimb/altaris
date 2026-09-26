@@ -42,6 +42,7 @@ const PRECACHE = [
   "./src/ui/components.css",
   "./src/ui/feedback.js",
   "./src/ui/icons.js",
+  "./src/ui/poses.js",
   "./src/ui/tokens.css",
   "./src/views/auth.js",
   "./src/views/climber.js",

@@ -4,10 +4,12 @@ import { readFileSync, writeFileSync } from "node:fs";
 
 const src = readFileSync(new URL("../src/domain/exercises.js", import.meta.url), "utf8");
 const start = src.indexOf("const EX_CATS");
-const end = src.indexOf("const EXERCISES = _X;");
+const end = src.indexOf("/* La bibliothèque affichée");
 if (start < 0 || end < 0) throw new Error("exercise bank markers not found in src/domain/exercises.js");
 
-const exercises = new Function(src.slice(start, end) + "return _X;")();
+// Exercises replaced by the v2 bank (see REPLACED) are left out: the v2 migration inserts their successors.
+const { _X, REPLACED } = new Function(src.slice(start, end) + "return { _X, REPLACED };")();
+const exercises = _X.filter((x) => !REPLACED[x.id]);
 
 const split = (s) => {
   const [fr, en] = String(s ?? "").split("|");
