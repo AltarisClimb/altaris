@@ -1,0 +1,39 @@
+/* ALTARIS™ — © 2026 ALTARIS™. All rights reserved. */
+/* ============================================================
+   ALTARIS™ — Design tokens
+   Dark-native by client directive (CDC §1). Light theme opt-in.
+   ============================================================ */
+:root{
+  --bg:#080D18; --bg-grad:#0A1020;
+  --surface:#0F172A; --surface-2:#15203A; --surface-3:#1C2A49;
+  --line:#243352; --line-soft:#1A2740;
+  --ink:#E8EEF8; --ink-2:#9FB0CB; --ink-3:#6B7E9E;
+  --accent:#22D3EE; --accent-2:#67E8F9; --accent-ink:#04141B; --accent-dim:#0E7C93;
+  --accent-wash:rgba(34,211,238,.10); --accent-line:rgba(34,211,238,.30);
+  --good:#35C48D; --warn:#E8A33D; --crit:#E8654F;
+  --good-wash:rgba(53,196,141,.13); --warn-wash:rgba(232,163,61,.13); --crit-wash:rgba(232,101,79,.13);
+  --s1:#1695B3; --s2:#AD7C13; --s3:#956DD4; --s4:#3D9D46; --s5:#5781E3; --s6:#D35A55;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 8px 28px rgba(0,0,0,.42);
+  --shadow-sm:0 1px 2px rgba(0,0,0,.4);
+  --r:12px; --r-sm:8px; --r-lg:18px;
+  --tap:46px;
+  --serif:"Cormorant Garamond",Georgia,"Times New Roman",serif;
+  --sans:"Barlow","Helvetica Neue",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --maxw:1240px;
+  color-scheme:dark;
+}
+:root[data-theme="light"]{
+  --bg:#EDF1F7; --bg-grad:#F4F7FB;
+  --surface:#FFFFFF; --surface-2:#F5F8FC; --surface-3:#E8EFF8;
+  --line:#D2DCEA; --line-soft:#E3EAF4;
+  --ink:#0F172A; --ink-2:#4A5B7A; --ink-3:#74859F;
+  --accent:#0E7490; --accent-2:#0891B2; --accent-ink:#FFFFFF; --accent-dim:#0E7490;
+  --accent-wash:rgba(14,116,144,.09); --accent-line:rgba(14,116,144,.28);
+  --good:#0F8A5F; --warn:#B5730B; --crit:#C0453A;
+  --good-wash:rgba(15,138,95,.11); --warn-wash:rgba(181,115,11,.11); --crit-wash:rgba(192,69,58,.11);
+  --s1:#1388A4; --s2:#9E7110; --s3:#8A5FC9; --s4:#299236; --s5:#4B74D8; --s6:#C74B47;
+  --shadow:0 1px 2px rgba(15,23,42,.07), 0 8px 24px rgba(15,23,42,.09);
+  --shadow-sm:0 1px 2px rgba(15,23,42,.08);
+  color-scheme:light;
+}

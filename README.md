@@ -7,18 +7,59 @@ Confidential and Proprietary Systems.
 
 ## 1. Ce que contient ce dossier
 
-| Fichier | Rôle |
-|---|---|
-| `index.html` | L'application complète. Vanilla JS, aucun build, aucune dépendance npm. |
-| `sw.js` | Service worker : cache l'app et les polices → l'app fonctionne hors ligne en salle. |
-| `manifest.webmanifest` | Manifeste PWA : installation sur l'écran d'accueil iOS / Android. |
-| `icon-192.png`, `icon-512.png`, `favicon.svg` | Icônes dérivées du logo officiel. |
-| `vercel.json` | En-têtes de sécurité et politique de cache. Ignoré par les autres hébergeurs. |
+```
+index.html              coquille : métadonnées, feuilles de style, point de montage
+src/
+  main.js               amorçage et boucle de rendu
+  bus.js                relie la couche de données au rendu sans cycle d'imports
+  core.js               helpers DOM, dates, arithmétique
+  data.js               persistance, session, RBAC  ← la couture Supabase
+  i18n/                 fr-FR.js · en-US.js · index.js
+  domain/               grades.js · scoring.js · workload.js · exercises.js
+  ui/                   tokens.css · components.css · icons · charts · brand · feedback
+  views/                shell · auth · onboarding · climber · testing · library · staff
+  modals.js  seed.js  export.js  actions.js
+tests/                  suite exécutable avec node --test
+sw.js                   service worker (mode hors ligne)
+manifest.webmanifest    manifeste PWA
+vercel.json             en-têtes de sécurité et politique de cache
+```
+
+**Modules ES natifs, aucune étape de build, aucune dépendance npm.** Le
+navigateur charge `src/main.js` et résout les imports lui-même. `package.json`
+ne sert qu'à lancer les tests.
 
 Une seule ressource externe : les polices Google (Cormorant Garamond, Barlow,
-IBM Plex Mono). Tout le reste est embarqué dans `index.html`.
+IBM Plex Mono).
 
----
+### Lancer les tests
+
+```bash
+npm test          # 39 tests, aucune dépendance à installer
+```
+
+Ils couvrent le calcul de charge et l'ACWR (moyenne glissante et EWMA), la
+monotonie et la contrainte de Foster, la normalisation des scores, l'aiguillage
+au seuil 7a/V6, les garde-fous de douleur, et un contrôle qui refuse tout
+module oublié dans le pré-cache du service worker.
+
+### Servir en local
+
+```bash
+npm run serve     # http://localhost:8080
+```
+
+Ouvrir `index.html` en `file://` ne fonctionne pas : les modules ES exigent
+le protocole HTTP.
+
+### Deux règles à respecter en modifiant le code
+
+1. **Tout fichier ajouté sous `src/` doit être listé dans `PRECACHE` de
+   `sw.js`**, sinon le mode hors ligne casse en silence. Le test
+   `tests/precache.test.js` échoue si vous l'oubliez.
+2. **La couche `data.js` et `domain/` ne doit jamais importer `views/` ni
+   `actions.js`.** C'est ce qui permet de tester le métier sous Node sans
+   navigateur. Le bus de rendu (`bus.js`) existe pour ça.
 
 ## 2. LIRE AVANT DE DÉPLOYER — le point qui change tout
 
