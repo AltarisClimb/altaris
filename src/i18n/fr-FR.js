@@ -89,6 +89,8 @@ export default {
   "auth.localModeD": "La base partagée n'est pas disponible sur cette vue. Les données restent sur cet appareil uniquement.",
   "auth.remoteSubtitle": "Connectez-vous avec l'e-mail et le mot de passe de votre compte.",
   "auth.password": "Mot de passe",
+  "auth.show": "Afficher",
+  "auth.hide": "Masquer",
   "auth.passwordHint": "8 caractères minimum.",
   "auth.forgot": "Mot de passe oublié ?",
   "auth.forgotNeedsMail": "Saisissez d'abord votre e-mail ci-dessus.",

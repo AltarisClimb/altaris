@@ -11,6 +11,12 @@ import { TABS, View, initials } from "./shell.js";
    10. AUTH
    ================================================================ */
 /* Le logo est déjà dans la barre du haut : pas de second logo ni de slogan ici. */
+/** Champ mot de passe avec un bouton Afficher / Masquer. */
+function pwField(id, attrs){
+  return '<span class="unit"><input class="inp" id="' + id + '"' + attrs + '>' +
+    '<button type="button" class="u pw-eye" data-act="pw-toggle" data-v="' + id + '" aria-pressed="false">' + esc(t("auth.show")) + '</button></span>';
+}
+
 function authHead(){ return topo(); }
 
 /* ---------------- Supabase : e-mail + mot de passe ---------------- */
@@ -22,7 +28,7 @@ function viewAuthRemote(){
       '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span>' +
         '<input class="inp" id="li-mail" data-fk="li-mail" type="email" autocomplete="username" required></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
-        '<input class="inp" id="li-pass" data-fk="li-pass" type="password" autocomplete="current-password" required></label>' +
+        pwField("li-pass", ' data-fk="li-pass" type="password" autocomplete="current-password" required') + '</label>' +
       '<div id="li-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
       '<button class="btn pri wide" type="submit">' + esc(t("auth.signIn")) + '</button>' +
       '<button class="btn ghost sm" type="button" data-act="remote-forgot">' + esc(t("auth.forgot")) + '</button>' +
@@ -83,7 +89,7 @@ function remoteSignUpModal(){
       '<label class="f"><span class="lb">' + esc(t("auth.fullName")) + '</span><input class="inp" id="na-name" autocomplete="name"></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span><input class="inp" id="na-mail" type="email" autocomplete="email"></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
-        '<input class="inp" id="na-pass" type="password" autocomplete="new-password">' +
+        pwField("na-pass", ' type="password" autocomplete="new-password"') +
         '<span class="hint">' + esc(t("auth.passwordHint")) + '</span></label>' +
       '<div class="notice acc">' + ic("shield") + '<span>' + esc(t("auth.remoteRoleD")) + '</span></div>' +
       '<div id="na-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
@@ -118,7 +124,7 @@ function viewSetPassword(){
     '<form class="panel pad stack" data-act-submit="remote-setpass" novalidate>' +
       '<span class="eyebrow">' + esc(t("auth.newPassword")) + '</span>' +
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
-        '<input class="inp" id="sp-pass" data-fk="sp-pass" type="password" autocomplete="new-password">' +
+        pwField("sp-pass", ' data-fk="sp-pass" type="password" autocomplete="new-password"') +
         '<span class="hint">' + esc(t("auth.passwordHint")) + '</span></label>' +
       '<div id="sp-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
       '<button class="btn pri wide" type="submit">' + esc(t("g.save")) + '</button>' +

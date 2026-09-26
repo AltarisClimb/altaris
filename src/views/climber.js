@@ -11,6 +11,7 @@ import { acwrGauge, acwrSeries, radarChart, typeBars, workloadChart } from "../u
 import { ic } from "../ui/icons.js";
 import { DAYS } from "./onboarding.js";
 import { progressPanel } from "./progress.js";
+import { TYPE_COLOR } from "./today.js";
 import { View } from "./shell.js";
 /* ================================================================
    12. CLIMBER — overview
@@ -220,7 +221,7 @@ function planningGrid(user){
             slots.map(s => '<div class="av">' + esc(s.start) + '–' + esc(s.end) + ' · ' + esc(t("st."+s.type)) + '</div>').join("") +
             list.map(s => {
               const cls = s.status === "done" ? "done" : s.status === "missed" ? "missed" : s.type === "rest" ? "rest" : "";
-              return '<button class="blk ' + cls + '" data-act="session-open" data-v="' + esc(s.id) + '"' +
+              return '<button class="blk ' + cls + '" data-act="session-open" data-v="' + esc(s.id) + '" style="--type:' + (TYPE_COLOR[s.type] || 'var(--accent)') + '"' +
                 (asCoach ? ' draggable="true" data-drag="' + esc(s.id) + '"' : '') + '>' +
                 '<span class="bt">' + esc(s.title) + '</span>' +
                 '<span class="bm">' + (s.status === "done" ? "RPE " + s.rpe + " · " + fmtNum(s.load)
@@ -317,7 +318,7 @@ function agenda(u){
         (list.length ? list.map(s => {
           const st = sessionStatus(s), tm = sessionStart(s, p);
           const due = st[1] === "warn";
-          return '<button class="ag-row" data-act="' + (due ? 'validate' : 'session-open') + '" data-v="' + esc(s.id) + '">' +
+          return '<button class="ag-row" data-act="' + (due ? 'validate' : 'session-open') + '" data-v="' + esc(s.id) + '" style="--type:' + (TYPE_COLOR[s.type] || 'var(--accent)') + '">' +
             '<span class="ag-time">' + esc(tm || "—") + '</span>' +
             '<span class="ag-main"><span class="ag-t">' + esc(s.title) + '</span>' +
               '<span class="ag-m">' + esc(t("st." + s.type)) + (s.type === "rest" ? '' : ' · ' + esc(fmtDuration(s.status === "done" ? s.actualMin : s.plannedMin)) +

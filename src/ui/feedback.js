@@ -5,8 +5,12 @@ function toast(msg, kind){
   const el = document.createElement("div");
   el.className = "toast" + (kind ? " " + kind : "");
   el.textContent = msg;
+  el.setAttribute && el.setAttribute("role", kind === "crit" ? "alert" : "status");
   $("#toasts").appendChild(el);
-  setTimeout(() => { el.style.opacity = "0"; el.style.transition = "opacity .25s"; setTimeout(() => el.remove(), 260); }, 2600);
+  /* Une erreur doit pouvoir se lire : 6 s au lieu de 2,6 s ; un tap la ferme. */
+  const hide = () => { el.style.opacity = "0"; el.style.transition = "opacity .25s"; setTimeout(() => el.remove(), 260); };
+  el.onclick = hide;
+  setTimeout(hide, kind === "crit" ? 6000 : 2600);
 }
 
 /* ---------------- modal stack ---------------- */

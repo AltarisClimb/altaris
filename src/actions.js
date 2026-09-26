@@ -37,6 +37,14 @@ const ACTIONS = {
   "pick-user": (v) => { const u = Store.get("users", v); if (u) askPin(u); },
   "new-account": () => newAccountModal(),
   "remote-signin": () => remoteSignIn(),
+  /* Afficher / masquer le mot de passe tapé (sans re-rendu : la saisie est conservée). */
+  "pw-toggle": (v, el) => {
+    const inp = document.getElementById(v); if (!inp) return;
+    const show = inp.type === "password";
+    inp.type = show ? "text" : "password";
+    el.textContent = t(show ? "auth.hide" : "auth.show");
+    el.setAttribute("aria-pressed", String(show));
+  },
   "remote-forgot": () => remoteForgot(),
   "remote-setpass": () => remoteSetPassword(),
   "seed-demo": () => seedDemo(),

@@ -89,6 +89,8 @@ export default {
   "auth.localModeD": "The shared database is unavailable in this view. Data stays on this device only.",
   "auth.remoteSubtitle": "Sign in with your account email and password.",
   "auth.password": "Password",
+  "auth.show": "Show",
+  "auth.hide": "Hide",
   "auth.passwordHint": "At least 8 characters.",
   "auth.forgot": "Forgot password?",
   "auth.forgotNeedsMail": "Enter your email above first.",

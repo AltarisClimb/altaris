@@ -26,7 +26,8 @@ let _rt = null;
 function renderDebounced(){ clearTimeout(_rt); _rt = setTimeout(render, 140); }
 
 function body(){
-  if (Remote.enabled() && Remote.booting) return "<main></main>";    // session pas encore connue : pas de flash de l'écran de connexion
+  /* Session pas encore connue : des blocs de chargement, pas de flash de l'écran de connexion. */
+  if (Remote.enabled() && Remote.booting) return '<main><div class="sk" aria-busy="true"><i class="h"></i><i class="card"></i><i></i><i class="half"></i><i></i></div></main>';
   if (Remote.recovery) return viewSetPassword();
   const me = Session.live();
   if (!me) return viewAuth();

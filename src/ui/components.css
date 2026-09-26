@@ -287,9 +287,10 @@ table.dt tbody tr:hover{background:var(--surface-2)}
 .toast.crit{border-color:color-mix(in srgb,var(--crit) 46%,transparent); color:var(--crit)}
 
 /* ---------- empty / notice ---------- */
-.empty{padding:34px 20px; text-align:center; color:var(--ink-3)}
-.empty svg{width:34px;height:34px;stroke:currentColor;fill:none;stroke-width:1.4;opacity:.5;margin-bottom:9px}
-.empty .t{font-size:14.5px; color:var(--ink-2); font-weight:600; margin-bottom:3px}
+.empty{padding:38px 20px; text-align:center; color:var(--ink-3)}
+.empty > svg{width:64px;height:64px;padding:16px;border-radius:50%;background:var(--accent-wash);color:var(--accent);
+  stroke:currentColor;fill:none;stroke-width:1.6;margin-bottom:12px}
+.empty .t{font-size:16px; color:var(--ink); font-weight:600; margin-bottom:4px}
 .empty .d{font-size:12.5px; max-width:44ch; margin:0 auto; line-height:1.55}
 .notice{display:flex; gap:10px; padding:12px 14px; border-radius:10px; background:var(--surface-2);
   border:1px solid var(--line); font-size:12.5px; line-height:1.55; color:var(--ink-2)}
@@ -330,7 +331,7 @@ table.dt tbody tr:hover{background:var(--surface-2)}
 .day .dn{font-family:var(--mono); font-size:11px; color:var(--ink-3); text-align:right; padding:0 3px; flex:none}
 .day.today .dn{color:var(--accent); font-weight:600}
 .day .av{font-size:8.5px; color:var(--ink-3); padding:0 3px; line-height:1.3; letter-spacing:.02em}
-.blk{border-radius:6px; padding:4px 5px; font-size:10px; line-height:1.28; border-left:2.5px solid var(--accent);
+.blk{border-radius:6px; padding:4px 5px; font-size:10px; line-height:1.28; border-left:2.5px solid var(--type, var(--accent));
   background:var(--surface-3); cursor:pointer; text-align:left; width:100%; transition:background .12s}
 .blk:hover{background:var(--line)}
 .blk .bt{display:block; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--ink)}
@@ -593,3 +594,21 @@ button.excard:hover{border-color:var(--accent-line); transform:translateY(-1px)}
   background:var(--surface-2); border:2px solid transparent; font-weight:600; font-size:13px}
 .kd span{font-size:30px; line-height:1}
 .kd.on{border-color:var(--accent); background:var(--accent-wash)}
+
+/* ---------- passe visuelle ---------- */
+/* Couleur du type de séance sur les lignes du programme. */
+.ag-row::before{content:""; width:4px; align-self:stretch; border-radius:2px; background:var(--type, var(--accent)); flex:none}
+.pw-eye{cursor:pointer; font-weight:600; color:var(--accent); font-size:12.5px}
+/* Changement d'onglet : apparition douce. */
+main > *{animation:fade-up .22s ease both}
+@keyframes fade-up{from{opacity:0; transform:translateY(6px)} to{opacity:1; transform:none}}
+/* Chargement au démarrage : blocs gris animés plutôt qu'un écran vide. */
+.sk{display:grid; gap:14px; max-width:720px; margin:24px auto 0}
+.sk i{display:block; height:18px; border-radius:8px; background:linear-gradient(90deg, var(--surface-2), var(--surface-3), var(--surface-2));
+  background-size:200% 100%; animation:sk 1.2s ease-in-out infinite}
+.sk i.h{height:34px; width:55%}
+.sk i.card{height:170px; border-radius:var(--r-lg)}
+.sk i.half{width:70%}
+@keyframes sk{from{background-position:100% 0} to{background-position:-100% 0}}
+.toast{cursor:pointer}
+@media (prefers-reduced-motion:reduce){ main > *{animation:none} .sk i{animation:none} }
