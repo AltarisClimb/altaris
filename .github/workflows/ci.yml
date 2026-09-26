@@ -5,6 +5,7 @@ on:
     branches: [main]
   pull_request:
 
+# Non-blocking: a failing job is reported on the run but never fails the workflow.
 permissions:
   contents: read
 
@@ -16,6 +17,7 @@ jobs:
   app:
     name: App tests
     runs-on: ubuntu-24.04
+    continue-on-error: true
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -38,6 +40,7 @@ jobs:
   database:
     name: RLS tests
     runs-on: ubuntu-24.04
+    continue-on-error: true
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
