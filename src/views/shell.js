@@ -57,7 +57,8 @@ function tabBadge(id){
 function topbar(){
   const me = Session.live();
   return '<div class="topbar">' +
-    logo(19, { wordH: 15 }) +
+    (me ? '<button class="home-link" data-act="home" title="' + esc(t("g.home")) + '" aria-label="' + esc(t("g.home")) + '">' + logo(19, { wordH: 15 }) + '</button>'
+        : logo(19, { wordH: 15 })) +
     '<span class="spacer"></span>' +
     '<div class="seg sm" role="group" aria-label="' + esc(t("g.language")) + '">' +
       '<button data-act="lang" data-v="auto" class="' + (LANG_PREF==="auto"?"on":"") + '" title="' + esc(t("g.langAutoD")) + '">' + esc(t("g.langAuto")) + '</button>' +

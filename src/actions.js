@@ -12,7 +12,7 @@ import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
-import { View } from "./views/shell.js";
+import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
 /* ================================================================
    23. ACTION DISPATCH
@@ -28,6 +28,8 @@ const ACTIONS = {
   },
   signout: () => { View.tab = null; View.athlete = null; if (Remote.client) setExercises([]); Session.signOut(); },
   tab: (v) => { View.tab = v; View.athlete = null; window.scrollTo(0,0); render(); },
+  /* Logo: back to the role's first tab (Synthèse for a climber, Athletes for coach/admin). */
+  home: () => { const me = Session.live(); if (!me) return; View.tab = TABS[me.role][0][0]; View.athlete = null; window.scrollTo(0,0); render(); },
   legal: () => legalModal(),
   print: () => window.print(),
   "pick-user": (v) => { const u = Store.get("users", v); if (u) askPin(u); },
