@@ -12,6 +12,8 @@ import { viewOnboarding } from "./views/onboarding.js";
 import { HIDDEN_TABS, TABS, View, legalFooter, tabsBar, topbar, watermark } from "./views/shell.js";
 import { viewAdmin, viewAthleteFile, viewFleet, viewInbox, viewPlanning } from "./views/staff.js";
 import { bindTimer, updateLiveMetric, viewTests } from "./views/testing.js";
+import { bindPlayer, viewPlayer } from "./views/player.js";
+import { viewToday } from "./views/today.js";
 /* Import à effet de bord : actions.js n'exporte rien que main utilise,
    mais il enregistre tous les écouteurs d'événements de l'application.
    Sans cette ligne l'interface s'affiche et ne répond à aucun clic. */
@@ -29,6 +31,7 @@ function body(){
   const me = Session.live();
   if (!me) return viewAuth();
   if (me.role === "climber" && View.onb) return viewOnboarding();
+  if (View.player) return viewPlayer();                              // séance guidée : plein écran, sans onglets
   if (me.role === "climber" && !(me.profile||{}).onboarded && !View.onb){
     View.onb = { step:0, data: Object.assign({ sex:"x", discipline:"both", injuries:[], availability:[], goals:[] }, me.profile||{}) };
     return viewOnboarding();
@@ -36,6 +39,7 @@ function body(){
   if (!View.tab || !((TABS[me.role]||[]).some(x => x[0] === View.tab) || HIDDEN_TABS.includes(View.tab))) View.tab = TABS[me.role][0][0];
   let inner = "";
   switch (View.tab){
+    case "today":     inner = viewToday(me); break;
     case "overview":  inner = viewOverview(me); break;
     case "calendar":  inner = viewCalendar(me, false); break;
     case "tests":     inner = viewTests(me); break;
@@ -65,6 +69,7 @@ function render(){
   }
   window.scrollTo(0, sy);
   if (View.runner){ bindTimer(); updateLiveMetric(); }
+  if (View.player) bindPlayer();
 }
 
 /* Le bus relie la couche de données au rendu sans créer de cycle. */

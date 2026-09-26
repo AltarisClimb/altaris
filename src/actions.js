@@ -13,6 +13,7 @@ import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
+import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { sessionsOf } from "./views/climber.js";
 import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
@@ -42,6 +43,22 @@ const ACTIONS = {
   "purge-demo": () => { if (confirm(t("ad.purgeConfirm"))) purgeDemo(); },
   "export-all": () => saveFile("altaris-export-" + today() + ".json", JSON.stringify(exportPayload("all"), null, 2)),
   /* Séances à venir → fichier .ics (rappel 1 h avant), à ouvrir avec l'agenda du téléphone. */
+  /* --- séance guidée (src/views/player.js) --- */
+  "play-start": (v) => { startPlayer(v); window.scrollTo(0,0); render(); },
+  "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
+  "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
+  "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },
+  "play-set": (v) => { playerActions.set(Number(v)); render(); },
+  "play-preset": (v) => { playerActions.preset(Number(v)); render(); },
+  "play-toggle": () => { playerActions.toggle(); render(); },
+  "play-rpe": (v) => { playerActions.rpe(Number(v)); render(); },
+  "play-finish": async () => { if (await playerActions.finish()){ window.scrollTo(0,0); render(); } },
+  "play-close": () => {
+    const p = View.player;
+    if (p && !p.finished && Date.now() - p.startedAt > 60000 && !confirm(t("pl.quitConfirm"))) return;
+    stopPlayer(); View.tab = "today"; window.scrollTo(0,0); render();
+  },
+  "play-message": () => { stopPlayer(); View.tab = "messages"; render(); },
   "cal-subscribe": () => calendarSubscribeModal(),
   /* Notifications : l'autorisation est demandée ici, suite à un geste de l'utilisateur (exigé par iOS). */
   "push-on": async () => {
@@ -225,6 +242,8 @@ document.addEventListener("input", (e) => {
   if (el){
     if (el.dataset.actInput === "ex-q"){ View.exFilter.q = el.value; renderDebounced(); }
     if (el.dataset.actInput === "msg"){ View.msgDraft = el.value; }
+    if (el.dataset.actInput === "pl-dur" && View.player){ View.player.durInput = el.value; }
+    if (el.dataset.actInput === "pl-fb" && View.player){ View.player.fb = el.value; }
     return;
   }
   if (e.target.closest("[data-rf]")) updateLiveMetric();

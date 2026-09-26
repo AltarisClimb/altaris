@@ -26,8 +26,10 @@ try{ View.theme = localStorage.getItem("altaris.theme") || null; }catch(e){}
 if (View.theme) document.documentElement.setAttribute("data-theme", View.theme);
 
 const TABS = {
-  climber: [["overview","nav.overview","home"],["calendar","nav.calendar","cal"],["tests","nav.tests","test"],
-            ["exercises","nav.exercises","book"],["messages","nav.messages","chat"],["profile","nav.profile","user"]],
+  /* Grimpeur : « Aujourd'hui » d'abord (la séance du jour), le programme, la
+     progression (ex-Synthèse). Tests et bibliothèque s'ouvrent depuis ces écrans. */
+  climber: [["today","nav.today","home"],["calendar","nav.program","cal"],["overview","nav.progress","trend"],
+            ["messages","nav.messages","chat"],["profile","nav.profile","user"]],
   /* Encadrants : « À traiter » d'abord ; le profil s'ouvre depuis l'avatar en haut à droite. */
   coach:   [["inbox","nav.inbox","alert"],["athletes","nav.athletes","users"],["planning","nav.planning","cal"],
             ["exercises","nav.exercises","book"],["messages","nav.messages","chat"]],
@@ -36,8 +38,9 @@ const TABS = {
   admin:   [["inbox","nav.inbox","alert"],["athletes","nav.athletes","users"],["planning","nav.planning","cal"],
             ["exercises","nav.exercises","book"],["messages","nav.messages","chat"],["admin","nav.admin","shield"]]
 };
-/** Onglets ouverts sans figurer dans la barre (le profil, via l'avatar). */
-const HIDDEN_TABS = ["profile"];
+/** Onglets ouverts sans figurer dans la barre : le profil (avatar), et pour le
+    grimpeur les tests et la bibliothèque (liens depuis Aujourd'hui et Progrès). */
+const HIDDEN_TABS = ["profile", "tests", "exercises"];
 
 /** Coach ou admin : tout ce qui relève de l'encadrement. */
 function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
@@ -45,7 +48,7 @@ function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
 function tabBadge(id){
   const me = Session.live(); if (!me) return 0;
   if (me.role === "climber"){
-    if (id === "overview") return Store.list("sessions").filter(s => s.userId === me.id && s.status === "planned" && diffDays(today(), s.date) >= 0).length;
+    if (id === "today") return Store.list("sessions").filter(s => s.userId === me.id && s.status === "planned" && diffDays(today(), s.date) >= 0).length;
     if (id === "messages") return unreadCount(me.id);
   }
   if (isStaff(me)){
