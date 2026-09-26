@@ -5,11 +5,50 @@
    - App shell (this origin): stale-while-revalidate, so a dropped
      connection at the wall never blanks the page.
    - Google Fonts: cache-first, they never change under a given URL.
-   - Everything else: network, falling back to cache. */
-const VERSION = "altaris-v1.0.0";
+   - Everything else: network, falling back to cache.
+
+   PRECACHE lists every module. It is generated from the source tree —
+   if you add a file under src/, add it here too or it will be missing
+   offline. Bump VERSION on every release so clients refresh the cache. */
+const VERSION = "altaris-v1.1.0";
 const SHELL = VERSION + "-shell";
 const FONTS = VERSION + "-fonts";
-const PRECACHE = ["./", "./index.html", "./manifest.webmanifest", "./favicon.svg", "./icon-192.png", "./icon-512.png"];
+const PRECACHE = [
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./favicon.svg",
+  "./icon-192.png",
+  "./icon-512.png",
+  "./src/actions.js",
+  "./src/bus.js",
+  "./src/core.js",
+  "./src/data.js",
+  "./src/domain/exercises.js",
+  "./src/domain/grades.js",
+  "./src/domain/scoring.js",
+  "./src/domain/workload.js",
+  "./src/export.js",
+  "./src/i18n/en-US.js",
+  "./src/i18n/fr-FR.js",
+  "./src/i18n/index.js",
+  "./src/main.js",
+  "./src/modals.js",
+  "./src/seed.js",
+  "./src/ui/brand.js",
+  "./src/ui/charts.js",
+  "./src/ui/components.css",
+  "./src/ui/feedback.js",
+  "./src/ui/icons.js",
+  "./src/ui/tokens.css",
+  "./src/views/auth.js",
+  "./src/views/climber.js",
+  "./src/views/library.js",
+  "./src/views/onboarding.js",
+  "./src/views/shell.js",
+  "./src/views/staff.js",
+  "./src/views/testing.js"
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then(c => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
