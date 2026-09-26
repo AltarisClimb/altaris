@@ -3,13 +3,141 @@ import { Session, Store, audit } from "../data.js";
 import { t } from "../i18n/index.js";
 import { body, render } from "../main.js";
 import { logo, topo } from "../ui/brand.js";
-import { Modal } from "../ui/feedback.js";
+import { Remote } from "../remote.js";
+import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { TABS, View, initials } from "./shell.js";
 /* ================================================================
    10. AUTH
    ================================================================ */
+function authHead(){
+  return '<div class="center stack sm">' + logo(46, { wordH: 34 }) +
+      '<p class="muted" style="font-size:14px;margin-top:6px">' + esc(t("app.tagline")) + '</p></div>' + topo();
+}
+
+/* ---------------- Supabase : e-mail + mot de passe ---------------- */
+function viewAuthRemote(){
+  return '<main><div class="stack lg" style="max-width:520px;margin:22px auto 0">' + authHead() +
+    '<form class="panel pad stack" data-act-submit="remote-signin" novalidate>' +
+      '<div class="stack sm"><span class="eyebrow">' + esc(t("auth.title")) + '</span>' +
+        '<p class="muted small">' + esc(t("auth.remoteSubtitle")) + '</p></div>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span>' +
+        '<input class="inp" id="li-mail" data-fk="li-mail" type="email" autocomplete="username" required></label>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
+        '<input class="inp" id="li-pass" data-fk="li-pass" type="password" autocomplete="current-password" required></label>' +
+      '<div id="li-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
+      '<button class="btn pri wide" type="submit">' + esc(t("auth.signIn")) + '</button>' +
+      '<button class="btn ghost sm" type="button" data-act="remote-forgot">' + esc(t("auth.forgot")) + '</button>' +
+    '</form>' +
+    '<button class="btn wide" data-act="new-account">' + ic("plus") + esc(t("auth.create")) + '</button>' +
+    '<div class="notice"><span>' + ic("lock") + '</span><span><b>' + esc(t("auth.security")) + '</b><br>' + esc(t("auth.securityRemoteD")) + '</span></div>' +
+  '</div></main>';
+}
+
+function authError(root, msg){
+  const e = $("#li-err", root) || $("#na-err", root) || $("#sp-err", root);
+  if (!e) return toast(msg, "crit");
+  e.style.display = "flex"; $("span", e).textContent = msg;
+}
+
+/** Message lisible pour les erreurs usuelles de Supabase Auth. */
+function authMessage(err){
+  const code = err && (err.code || "");
+  if (err && (err.name === "AuthRetryableFetchError" || err instanceof TypeError)) return t("auth.remoteDown");
+  if (code === "invalid_credentials") return t("auth.badCredentials");
+  if (code === "email_not_confirmed") return t("auth.notConfirmed");
+  if (code === "user_already_exists") return t("auth.exists");
+  if (code === "weak_password") return t("auth.weakPassword");
+  if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit") return t("auth.rateLimited");
+  return (err && err.message) || t("er.saveFailed");
+}
+
+async function remoteSignIn(){
+  const mail = $("#li-mail").value.trim(), pass = $("#li-pass").value;
+  if (!mail || !pass) return authError(document, t("er.required"));
+  try{ await Remote.signIn(mail, pass); }
+  catch(e){ return authError(document, authMessage(e)); }
+  const state = await Session.restoreRemote();
+  if (state === "suspended") return authError(document, t("auth.suspended"));
+  if (!Session.user) return authError(document, t("auth.noProfile"));
+  enter(Session.user);
+}
+
+function enter(u){
+  Session.signIn(u);
+  View.tab = TABS[u.role][0][0];
+  render();
+}
+
+async function remoteForgot(){
+  const mail = $("#li-mail").value.trim();
+  if (!mail) return authError(document, t("auth.forgotNeedsMail"));
+  try{ await Remote.resetPassword(mail); toast(t("auth.resetSent"), "good"); }
+  catch(e){ authError(document, authMessage(e)); }
+}
+
+function remoteSignUpModal(){
+  Modal.open({
+    title: t("auth.newTitle"),
+    body: '<div class="stack">' +
+      '<label class="f"><span class="lb">' + esc(t("auth.fullName")) + '</span><input class="inp" id="na-name" autocomplete="name"></label>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span><input class="inp" id="na-mail" type="email" autocomplete="email"></label>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
+        '<input class="inp" id="na-pass" type="password" autocomplete="new-password">' +
+        '<span class="hint">' + esc(t("auth.passwordHint")) + '</span></label>' +
+      '<div class="notice acc">' + ic("shield") + '<span>' + esc(t("auth.remoteRoleD")) + '</span></div>' +
+      '<div id="na-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
+    '</div>',
+    footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button><button class="btn pri" id="na-ok">' + esc(t("g.confirm")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      $("#na-ok", root).onclick = async () => {
+        const name = $("#na-name", root).value.trim();
+        const mail = $("#na-mail", root).value.trim();
+        const pass = $("#na-pass", root).value;
+        if (!name || !mail || !pass) return authError(root, t("er.required"));
+        if (pass.length < 8) return authError(root, t("auth.passwordHint"));
+        let signedIn;
+        try{ signedIn = await Remote.signUp(mail, pass, name); }
+        catch(e){ return authError(root, authMessage(e)); }
+        Modal.close();
+        if (!signedIn){ toast(t("auth.confirmSent"), "good"); return; }
+        await Session.restoreRemote();
+        if (!Session.user) return toast(t("auth.noProfile"), "crit");
+        audit("account_created", Session.user.role);
+        if (Session.user.role === "climber"){ View.onb = { step: 0, data: { sex:"x", discipline:"both", injuries: [], availability: [], goals: [] } }; }
+        enter(Session.user);
+      };
+    }
+  });
+}
+
+/** Arrivée par le lien « mot de passe oublié » : choisir le nouveau. */
+function viewSetPassword(){
+  return '<main><div class="stack lg" style="max-width:520px;margin:22px auto 0">' + authHead() +
+    '<form class="panel pad stack" data-act-submit="remote-setpass" novalidate>' +
+      '<span class="eyebrow">' + esc(t("auth.newPassword")) + '</span>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
+        '<input class="inp" id="sp-pass" data-fk="sp-pass" type="password" autocomplete="new-password">' +
+        '<span class="hint">' + esc(t("auth.passwordHint")) + '</span></label>' +
+      '<div id="sp-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
+      '<button class="btn pri wide" type="submit">' + esc(t("g.save")) + '</button>' +
+    '</form></div></main>';
+}
+
+async function remoteSetPassword(){
+  const pass = $("#sp-pass").value;
+  if (pass.length < 8) return authError(document, t("auth.passwordHint"));
+  try{ await Remote.setPassword(pass); }
+  catch(e){ return authError(document, authMessage(e)); }
+  toast(t("g.saved"), "good");
+  await Session.restoreRemote();
+  if (Session.user) enter(Session.user); else render();
+}
+
+/* ---------------- mode local : profils + code PIN ---------------- */
 function viewAuth(){
+  if (Remote.enabled()) return viewAuthRemote();
   const users = Store.list("users").filter(u => u.status !== "suspended");
   users.sort((a,b) => (a.role === b.role ? a.name.localeCompare(b.name) : (a.role === "admin" ? -1 : b.role === "admin" ? 1 : a.role === "coach" ? -1 : 1)));
   return '<main><div class="stack lg" style="max-width:520px;margin:22px auto 0">' +
@@ -69,6 +197,7 @@ function askPin(user){
 }
 
 function newAccountModal(){
+  if (Remote.enabled()) return remoteSignUpModal();
   const isFirst = Store.list("users").length === 0;
   Modal.open({
     title: t("auth.newTitle"),
@@ -112,4 +241,4 @@ function newAccountModal(){
   });
 }
 
-export { askPin, newAccountModal, viewAuth };
+export { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, viewAuth, viewSetPassword };

@@ -35,7 +35,7 @@ IBM Plex Mono).
 ### Lancer les tests
 
 ```bash
-npm test          # 39 tests, aucune dépendance à installer
+npm test          # 45 tests, aucune dépendance à installer
 ```
 
 Ils couvrent le calcul de charge et l'ACWR (moyenne glissante et EWMA), la

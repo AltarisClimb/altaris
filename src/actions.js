@@ -8,7 +8,7 @@ import { render, renderDebounced } from "./main.js";
 import { accountEditModal, availModal, blockEditor, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
-import { askPin, newAccountModal } from "./views/auth.js";
+import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
 import { exerciseModal, getThread } from "./views/library.js";
 import { View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
@@ -30,6 +30,9 @@ const ACTIONS = {
   print: () => window.print(),
   "pick-user": (v) => { const u = Store.get("users", v); if (u) askPin(u); },
   "new-account": () => newAccountModal(),
+  "remote-signin": () => remoteSignIn(),
+  "remote-forgot": () => remoteForgot(),
+  "remote-setpass": () => remoteSetPassword(),
   "seed-demo": () => seedDemo(),
   "purge-demo": () => { if (confirm(t("ad.purgeConfirm"))) purgeDemo(); },
   "export-all": () => saveFile("altaris-export-" + today() + ".json", JSON.stringify(exportPayload("all"), null, 2)),
@@ -38,7 +41,7 @@ const ACTIONS = {
   "acct-edit": (v) => accountEditModal(v),
   "acct-toggle": async (v) => {
     const u = Store.get("users", v); if (!u) return;
-    await Store.put("users", v, Object.assign({}, u, { status: u.status === "suspended" ? "active" : "suspended" }));
+    if (!await Store.put("users", v, Object.assign({}, u, { status: u.status === "suspended" ? "active" : "suspended" }))) return;
     audit("account_status", u.name + " → " + (u.status === "suspended" ? "active" : "suspended"));
   },
   "acwr-m": (v) => { View.acwrMethod = v; render(); },
@@ -172,6 +175,14 @@ document.addEventListener("click", (e) => {
     render();
   }
 });
+/* Formulaires : Entrée soumet, sans rechargement de page. */
+document.addEventListener("submit", (e) => {
+  const f = e.target.closest("form[data-act-submit]");
+  if (!f) return;
+  e.preventDefault();
+  const fn = ACTIONS[f.dataset.actSubmit];
+  if (fn) fn(f.dataset.v, f);
+});
 document.addEventListener("input", (e) => {
   const el = e.target.closest("[data-act-input]");
   if (el){
@@ -192,7 +203,7 @@ document.addEventListener("change", async (e) => {
   if (!el) return;
   if (el.dataset.actChange === "pair"){
     const u = Store.get("users", el.dataset.v); if (!u) return;
-    await Store.put("users", u.id, Object.assign({}, u, { coachId: el.value || null }));
+    if (!await Store.put("users", u.id, Object.assign({}, u, { coachId: el.value || null }))) return;
     audit("pairing_changed", u.name + " → " + (el.value ? (Store.get("users", el.value)||{}).name : "—"));
     toast(t("g.saved"), "good");
   }

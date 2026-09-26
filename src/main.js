@@ -1,8 +1,10 @@
 import { setRenderer } from "./bus.js";
 import { $ } from "./core.js";
 import { Session, Store } from "./data.js";
-import { LANG } from "./i18n/index.js";
-import { viewAuth } from "./views/auth.js";
+import { LANG, t } from "./i18n/index.js";
+import { Remote } from "./remote.js";
+import { toast } from "./ui/feedback.js";
+import { viewAuth, viewSetPassword } from "./views/auth.js";
 import { viewCalendar, viewOverview } from "./views/climber.js";
 import { viewExercises, viewMessages, viewProfile } from "./views/library.js";
 import { viewOnboarding } from "./views/onboarding.js";
@@ -21,6 +23,8 @@ let _rt = null;
 function renderDebounced(){ clearTimeout(_rt); _rt = setTimeout(render, 140); }
 
 function body(){
+  if (Remote.enabled() && Remote.booting) return "<main></main>";    // session pas encore connue : pas de flash de l'écran de connexion
+  if (Remote.recovery) return viewSetPassword();
   const me = Session.live();
   if (!me) return viewAuth();
   if (me.role === "climber" && View.onb) return viewOnboarding();
@@ -67,11 +71,26 @@ function render(){
 /* Le bus relie la couche de données au rendu sans créer de cycle. */
 setRenderer(render);
 
+/* Événements d'authentification survenus après le démarrage :
+   déconnexion ailleurs (jeton révoqué) ou arrivée par un lien de réinitialisation. */
+function onAuthEvent(event){
+  if (event === "SIGNED_OUT" && Session.user){ Session.user = null; View.tab = null; View.athlete = null; render(); }
+  if (event === "PASSWORD_RECOVERY") render();
+}
+
 /* boot */
 (async function boot(){
   document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR");
   await Store.init();
-  Session.restore();
+  if (Remote.enabled()){
+    try{
+      await Remote.init(onAuthEvent);
+      if (await Session.restoreRemote() === "suspended") toast(t("auth.suspended"), "crit");
+    }catch(e){ toast(t("auth.remoteDown"), "crit"); }
+    Remote.booting = false;
+  } else {
+    Session.restore();
+  }
   const me = Session.live();
   if (me) View.tab = TABS[me.role][0][0];
   render();

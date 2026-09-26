@@ -40,6 +40,7 @@ The service worker caches the app shell; hard-refresh or unregister it when iter
 Target roles: `admin`, `teacher`, `student` (the UI still says admin/coach/climber).
 
 - `supabase/migrations/` — schema + Row Level Security. Tables: `profiles` (role, status, `teacher_id` set by admins only), `exercises` (`visibility` is `free` = everyone, or `library` = teachers/admins, students only via assignment; only admins publish `free`), `assignments` (teacher → own students). Any change to who-can-see-what is a policy change **plus** a case in `supabase/tests/rls.sql`.
+- Client side: `src/config.js` holds the project URL + anon key (empty = local PIN mode). `src/remote.js` wraps auth and `profiles`, lazy-loads the vendored UMD client `src/vendor/supabase.js` (supabase-js, MIT; replace the file to upgrade), and is the only place that maps schema roles (admin/teacher/student) to UI roles (admin/coach/climber). In Supabase mode, `Store.put("users", …)` sends name/role/status/coach to the server first and only updates the local copy if the server accepts. The other collections are still local.
 - `supabase/seed.sql` is generated — don't edit by hand.
 - `supabase/tests/auth_stub.sql` fakes Supabase's `auth` schema and roles for local tests only; never apply it to a real project.
 

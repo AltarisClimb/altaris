@@ -4,6 +4,7 @@ import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, fontLabel, trackF
 import { DOMAIN_ORDER, assessmentsOf, latestAssessment, limiters } from "../domain/scoring.js";
 import { acwrZone, alertsFor, computeACWR, loadSeries, monotonyStrain } from "../domain/workload.js";
 import { LI, fmtDate, fmtNum, fmtTime, relDays, t } from "../i18n/index.js";
+import { Remote } from "../remote.js";
 import { acwrSeries, progressLines, radarChart, sparkline, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
 import { kpi, painLabel, sessionsOf, viewCalendar } from "./climber.js";
@@ -153,13 +154,16 @@ function viewPlanning(me){
    ================================================================ */
 function viewAccounts(){
   const users = Store.list("users").sort((a,b) => a.role === b.role ? a.name.localeCompare(b.name) : (a.role === "admin" ? -1 : b.role === "admin" ? 1 : a.role === "coach" ? -1 : 1));
+  /* En mode Supabase, les comptes naissent à l'inscription : pas de création ni de démo ici. */
+  const remote = !!Remote.client;
   const counts = { admin:0, coach:0, climber:0 };
   users.forEach(u => counts[u.role]++);
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("role.admin.portal")) + '</span>' +
       '<h2>' + esc(t("ad.accounts")) + '</h2><p>' + esc(t("ad.stats")) + ' · ' + users.length + ' ' + esc(t("nav.accounts").toLowerCase()) + '</p></div>' +
       '<div class="row tight noprint"><button class="btn sm ghost" data-act="export-all">' + ic("dl") + esc(t("ad.exportAll")) + '</button>' +
-      '<button class="btn sm pri" data-act="new-account">' + ic("plus") + esc(t("ad.newAccount")) + '</button></div></div>' +
+      (remote ? '' : '<button class="btn sm pri" data-act="new-account">' + ic("plus") + esc(t("ad.newAccount")) + '</button>') + '</div></div>' +
+    (remote ? '<div class="notice">' + ic("info") + '<span>' + esc(t("ad.remoteAccountsD")) + '</span></div>' : '') +
 
     '<div class="grid g4">' +
       kpi(t("role.admin"), String(counts.admin), "", t("nav.accounts")) +
@@ -193,7 +197,7 @@ function viewAccounts(){
       '<div class="row tight">' +
         '<button class="btn sm ghost" data-act="export-all">' + ic("dl") + esc(t("ad.exportAll")) + '</button>' +
         '<button class="btn sm danger" data-act="purge-demo">' + ic("trash") + esc(t("ad.purgeDemo")) + '</button>' +
-        (Store.list("users").length === 0 ? '' : '<button class="btn sm" data-act="seed-demo">' + ic("plus") + esc(t("auth.demoSeed")) + '</button>') +
+        (remote || Store.list("users").length === 0 ? '' : '<button class="btn sm" data-act="seed-demo">' + ic("plus") + esc(t("auth.demoSeed")) + '</button>') +
       '</div></div>' +
   '</div>';
 }

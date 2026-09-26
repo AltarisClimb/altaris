@@ -1,5 +1,6 @@
 import { $, $$, COPYRIGHT, esc, today, uid } from "./core.js";
 import { Access, Session, Store, audit } from "./data.js";
+import { Remote } from "./remote.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
 import { FONT, SPORT, fontLabel } from "./domain/grades.js";
 import { sessionLoad } from "./domain/workload.js";
@@ -340,11 +341,13 @@ function profileEditModal(){
 function accountEditModal(id){
   const u = Store.get("users", id); if (!u) return;
   const coaches = Store.list("users").filter(x => x.role === "coach");
+  /* En mode Supabase, l'e-mail appartient à Supabase Auth et il n'y a pas de PIN. */
+  const remote = !!Remote.client;
   Modal.open({
     title: u.name,
     body: '<div class="stack">' +
       '<label class="f"><span class="lb">' + esc(t("auth.fullName")) + '</span><input class="inp" id="ae-name" value="' + esc(u.name) + '"></label>' +
-      '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span><input class="inp" id="ae-mail" value="' + esc(u.email||"") + '"></label>' +
+      '<label class="f"><span class="lb">' + esc(t("auth.email")) + '</span><input class="inp" id="ae-mail" value="' + esc(u.email||"") + '"' + (remote ? " disabled" : "") + '></label>' +
       '<div class="grid g2">' +
         '<label class="f"><span class="lb">' + esc(t("ad.role")) + '</span><select class="inp" id="ae-role">' +
           ["climber","coach","admin"].map(r => '<option value="' + r + '"' + (u.role===r?" selected":"") + '>' + esc(t("role."+r)) + '</option>').join("") + '</select></label>' +
@@ -354,23 +357,25 @@ function accountEditModal(id){
       '<label class="f"><span class="lb">' + esc(t("ad.assignCoach")) + '</span><select class="inp" id="ae-coach">' +
         '<option value="">' + esc(t("g.unassigned")) + '</option>' +
         coaches.map(c => '<option value="' + esc(c.id) + '"' + (u.coachId===c.id?" selected":"") + '>' + esc(c.name) + '</option>').join("") + '</select></label>' +
+      (remote ? '' :
       '<label class="f" style="max-width:200px"><span class="lb">' + esc(t("ad.resetPin")) + '</span>' +
-        '<input class="inp num" id="ae-pin" maxlength="4" inputmode="numeric" placeholder="' + esc(String(u.pin)) + '"></label>' +
+        '<input class="inp num" id="ae-pin" maxlength="4" inputmode="numeric" placeholder="' + esc(String(u.pin)) + '"></label>') +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button><button class="btn pri" id="ae-ok">' + esc(t("g.save")) + '</button>',
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       $("#ae-ok", root).onclick = async () => {
-        const pin = $("#ae-pin", root).value.trim();
+        const pin = remote ? "" : $("#ae-pin", root).value.trim();
         if (pin && !/^\d{4}$/.test(pin)) return toast(t("er.pinFormat"), "crit");
-        await Store.put("users", u.id, Object.assign({}, u, {
+        const ok = await Store.put("users", u.id, Object.assign({}, u, {
           name: $("#ae-name", root).value.trim() || u.name,
-          email: $("#ae-mail", root).value.trim(),
+          email: remote ? u.email : $("#ae-mail", root).value.trim(),
           role: $("#ae-role", root).value,
           plan: $("#ae-plan", root).value,
           coachId: $("#ae-coach", root).value || null,
           pin: pin || u.pin
         }));
+        if (!ok) return;
         audit("account_updated", u.name);
         Modal.close(); toast(t("g.saved"), "good");
       };

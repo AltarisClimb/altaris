@@ -1,5 +1,6 @@
 import { requestRender } from "./bus.js";
 import { t } from "./i18n/index.js";
+import { Remote, profilePatch } from "./remote.js";
 import { toast } from "./ui/feedback.js";
 /* ================================================================
    2. PERSISTENCE LAYER
@@ -69,8 +70,31 @@ const Store = {
   list(col){ return Object.values(this.data[col] || {}); },
   get(col, id){ return (this.data[col] || {})[id] || null; },
 
+  /** Superpose les comptes Supabase aux documents "users" en cache.
+   *  Les champs locaux (profile, plan…) sont conservés ; les comptes du mode
+   *  PIN, qui n'existent pas côté serveur, sont écartés. */
+  mergeUsers(list){
+    const prev = this.data.users || {};
+    const next = {};
+    Object.values(prev).forEach(u => { if (u.remote) next[u.id] = u; });
+    list.forEach(u => { next[u.id] = Object.assign({}, prev[u.id], u, { remote: true }); });
+    this.data.users = next;
+    Remote.visible = new Set(list.map(u => u.id));
+    this.saveLocal();
+  },
+
   /** Write a whole document. Optimistic locally, queued if the cloud refuses. */
   async put(col, id, obj){
+    /* Rôle, statut, nom et coach vivent dans Supabase : le serveur tranche
+       d'abord (RLS + trigger), la copie locale ne suit qu'en cas de succès. */
+    if (col === "users" && Remote.client){
+      const before = this.get(col, id);
+      const patch = before ? profilePatch(before, obj) : {};
+      if (Object.keys(patch).length){
+        try{ await Remote.updateProfile(id, patch); }
+        catch(e){ toast(t("er.saveFailed"), "crit"); requestRender(); return false; }
+      }
+    }
     const doc = Object.assign({}, obj, { id: id });
     this.data[col] = this.data[col] || {};
     this.data[col][id] = doc;
@@ -163,6 +187,20 @@ const Session = {
       if (u && u.status !== "suspended") this.user = u;
     }catch(e){}
   },
+  /** Mode Supabase : la session vient du jeton, le compte de la table profiles.
+   *  Renvoie "suspended" si le compte est suspendu (la session est fermée). */
+  async restoreRemote(){
+    this.user = null;
+    const id = await Remote.userId();
+    if (!id) return null;
+    try{ Store.mergeUsers(await Remote.profiles()); }
+    catch(e){ /* hors ligne : on garde les comptes en cache */ }
+    const u = Store.get("users", id);
+    if (!u) return null;
+    if (u.status === "suspended"){ await Remote.signOut(); return "suspended"; }
+    this.user = u;
+    return null;
+  },
   signIn(u){
     this.user = u;
     try{ localStorage.setItem("altaris.session", u.id); }catch(e){}
@@ -173,6 +211,7 @@ const Session = {
     audit("sign_out", "");
     this.user = null;
     try{ localStorage.removeItem("altaris.session"); }catch(e){}
+    if (Remote.client) Remote.signOut();
     /* Le choix de l'onglet appartient à la couche vue : le dispatcher le
        remet à zéro avant d'appeler signOut(). Garder cette ligne ici
        ferait dépendre la couche de données de l'interface. */
@@ -189,11 +228,15 @@ function touch(userId){
 }
 
 /* ---------------- RBAC ---------------- */
+/* En mode Supabase, un compte resté en cache mais que la RLS ne renvoie plus
+   (appareil partagé, rattachement changé) ne doit plus apparaître. */
+function visible(u){ return !Remote.client || !Remote.visible.size || Remote.visible.has(u.id); }
+
 const Access = {
   /** Climbers visible to the signed-in user. */
   climbers(){
     const me = Session.live(); if (!me) return [];
-    const all = Store.list("users").filter(u => u.role === "climber" && u.status !== "suspended");
+    const all = Store.list("users").filter(u => u.role === "climber" && u.status !== "suspended" && visible(u));
     if (me.role === "admin") return all;
     if (me.role === "coach")  return all.filter(u => u.coachId === me.id);
     return all.filter(u => u.id === me.id);
@@ -202,7 +245,7 @@ const Access = {
     const me = Session.live(); if (!me) return false;
     if (me.id === userId) return true;
     if (me.role === "admin") return true;
-    if (me.role === "coach"){ const u = Store.get("users", userId); return !!u && u.coachId === me.id; }
+    if (me.role === "coach"){ const u = Store.get("users", userId); return !!u && u.coachId === me.id && visible(u); }
     return false;
   },
   /** Rows of a collection the signed-in user is allowed to read. */
