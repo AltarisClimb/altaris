@@ -1,5 +1,6 @@
 import { addDays, diffDays, esc, sum, today } from "../core.js";
 import { Store, config } from "../data.js";
+import { Remote } from "../remote.js";
 import { sessionStart, upcomingForAgenda } from "../domain/calendar.js";
 import { exById, exName } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
@@ -272,9 +273,11 @@ function agenda(u){
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
       '<h2>' + esc(t("cal.mySessions")) + '</h2></div>' +
+      /* En ligne : abonnement (mise à jour automatique) en premier, le fichier en secours. */
       '<div class="row tight noprint">' +
-        '<button class="btn sm pri" data-act="cal-export" data-v="' + esc(u.id) + '"' + (upcoming ? '' : ' disabled') + '>' +
-          ic("cal") + esc(t("cal.addToAgenda")) + '</button></div></div>' +
+        (Remote.client ? '<button class="btn sm pri" data-act="cal-subscribe">' + ic("cal") + esc(t("cal.subscribe")) + '</button>' : '') +
+        '<button class="btn sm' + (Remote.client ? ' ghost' : ' pri') + '" data-act="cal-export" data-v="' + esc(u.id) + '"' + (upcoming ? '' : ' disabled') + '>' +
+          (Remote.client ? ic("dl") + esc(t("cal.download")) : ic("cal") + esc(t("cal.addToAgenda"))) + '</button></div></div>' +
 
     (next ? '<div class="panel pad stack sm ag-next">' +
       '<span class="eyebrow">' + esc(t("ov.nextSession")) + '</span>' +

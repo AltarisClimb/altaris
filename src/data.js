@@ -1,5 +1,5 @@
 import { requestRender } from "./bus.js";
-import { t } from "./i18n/index.js";
+import { LANG, t } from "./i18n/index.js";
 import { Remote, profilePatch } from "./remote.js";
 import { toast } from "./ui/feedback.js";
 /* ================================================================
@@ -244,7 +244,11 @@ const Store = {
     if (!quiet){ this.saveLocal(); if (!this.silent) requestRender(); }
   },
   async sendMessage(athleteId, msg){
-    try{ this.addMessage(await Remote.sendMessage(athleteId, msg)); return true; }
+    try{
+      this.addMessage(await Remote.sendMessage(athleteId, msg));
+      Remote.notify({ kind: "message", athleteId });
+      return true;
+    }
     catch(e){ toast(t(isNetworkError(e) ? "er.offline" : "er.saveFailed"), "crit"); return false; }
   },
   /* ---------- consentement santé (RGPD art. 9) ---------- */
@@ -282,6 +286,7 @@ const Store = {
   startRemote(){
     if (!Remote.client) return;
     this.syncRemote();
+    Remote.saveDeviceInfo(Session.live(), LANG).catch(() => {});
     Remote.watch((col, id, row) => {
       if (!REMOTE_COLS.includes(col)) return;
       this.data[col] = this.data[col] || {};

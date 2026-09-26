@@ -10,7 +10,7 @@
    PRECACHE lists every module. It is generated from the source tree —
    if you add a file under src/, add it here too or it will be missing
    offline. Bump VERSION on every release so clients refresh the cache. */
-const VERSION = "altaris-v1.8.0";
+const VERSION = "altaris-v1.9.0";
 const SHELL = VERSION + "-shell";
 const FONTS = VERSION + "-fonts";
 const PRECACHE = [
@@ -108,4 +108,29 @@ self.addEventListener("fetch", (e) => {
       return hit || net;
     })
   );
+});
+
+/* Notifications (Web Push, envoyées par les Edge Functions notify / remind).
+   Le message porte { title, body, url, tag } ; un tap ouvre l'appli au bon onglet. */
+self.addEventListener("push", (e) => {
+  let msg = {};
+  try { msg = e.data ? e.data.json() : {}; } catch (err) { msg = { title: "ALTARIS", body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(msg.title || "ALTARIS", {
+    body: msg.body || "",
+    tag: msg.tag,
+    icon: "./icon-192.png",
+    badge: "./icon-192.png",
+    data: { url: msg.url || "./" }
+  }));
+});
+
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL((e.notification.data && e.notification.data.url) || "./", self.location.origin).href;
+  e.waitUntil((async () => {
+    const wins = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    const open = wins.find(w => new URL(w.url).origin === self.location.origin);
+    if (open) { await open.focus(); return open.navigate(url); }
+    return clients.openWindow(url);
+  })());
 });

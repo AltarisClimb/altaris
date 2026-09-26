@@ -5,6 +5,7 @@ import { fontLabel, trackFor } from "../domain/grades.js";
 import { latestAssessment } from "../domain/scoring.js";
 import { LI, LOC, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
 import { body, render } from "../main.js";
+import { VAPID_PUBLIC_KEY } from "../config.js";
 import { Remote } from "../remote.js";
 import { topo } from "../ui/brand.js";
 import { Modal, toast } from "../ui/feedback.js";
@@ -264,6 +265,26 @@ function viewMessages(me){
 /* ================================================================
    17. PROFILE + PAIN JOURNAL
    ================================================================ */
+/** Notifications de cet appareil (Web Push). L'état se lit de façon asynchrone, puis on réaffiche. */
+function notifSection(){
+  if (!Remote.client || !VAPID_PUBLIC_KEY) return "";
+  if (View.pushState === undefined){
+    View.pushState = "loading";
+    Remote.pushState().then(s => { View.pushState = s; render(); }).catch(() => { View.pushState = "unsupported"; render(); });
+  }
+  const st = View.pushState;
+  const iosBrowser = /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+    !(navigator.standalone || (window.matchMedia && matchMedia("(display-mode: standalone)").matches));
+  const text = st === "on" ? t("nt.on") : st === "denied" ? t("nt.denied")
+    : st === "unsupported" ? (iosBrowser ? t("nt.ios") : t("nt.unsupported")) : t("nt.off");
+  return '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("nt.title")) + '</span>' +
+    '<p class="small muted">' + esc(text) + '</p>' +
+    (st === "on" ? '<div class="row tight noprint"><button class="btn sm ghost" data-act="push-off">' + esc(t("nt.disable")) + '</button></div>'
+      : st === "off" ? '<div class="row tight noprint"><button class="btn sm pri" data-act="push-on">' + ic("chat") + esc(t("nt.enable")) + '</button></div>'
+      : '') +
+  '</div>';
+}
+
 function viewProfile(me){
   const p = me.profile || {};
   const track = trackFor(p);
@@ -303,6 +324,8 @@ function viewProfile(me){
     (p.goalText ? '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("pf.goals")) + '</span>' +
       '<p style="font-family:var(--serif);font-size:19px;line-height:1.4">' + esc(p.goalText) + '</p>' +
       (p.goalDate ? '<span class="chip acc">' + esc(fmtDateLong(p.goalDate)) + '</span>' : '') + '</div>' : '') +
+
+    notifSection() +
 
     /* Consentement santé (RGPD art. 9) : état, et le donner ou le retirer à tout moment. */
     (me.role === "climber" && Remote.client ? '<div class="panel pad stack sm">' +

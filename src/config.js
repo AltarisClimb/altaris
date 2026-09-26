@@ -8,4 +8,9 @@
 const SUPABASE_URL = "https://bunfdvzedeosliwylbzn.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_ncC6RsMSSBbpIeWLfD_csg_7vk_uCZh";
 
-export { SUPABASE_ANON_KEY, SUPABASE_URL };
+/* Clé publique VAPID des notifications (Web Push). Elle se génère avec
+   `npx web-push generate-vapid-keys` ; la clé privée va dans les secrets
+   Supabase (VAPID_PRIVATE_KEY), jamais ici. Vide = notifications désactivées. */
+const VAPID_PUBLIC_KEY = "";
+
+export { SUPABASE_ANON_KEY, SUPABASE_URL, VAPID_PUBLIC_KEY };

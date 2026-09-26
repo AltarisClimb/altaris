@@ -181,9 +181,25 @@ reset role;
 select t.ok('withdrawal erased S2 health data', (select count(*) from athlete_docs where athlete_id = :S2 and col in ('pain', 'assessments')) = 0);
 select t.ok('withdrawal kept S2 sessions', (select count(*) from athlete_docs where athlete_id = :S2 and col = 'sessions') = 1);
 
+-- ================= notifications & calendar feed
+select t.as(:S2); set role authenticated;
+select t.ok('S2 registers a device', t.rows('insert into push_subscriptions (endpoint, p256dh, auth) values (''https://push.example/s2'', ''k'', ''a'')') = 1);
+select t.ok('device is stamped with S2', (select user_id from push_subscriptions where endpoint = 'https://push.example/s2') = :S2);
+select t.err('S2 cannot register a device for T1', 'insert into push_subscriptions (endpoint, user_id, p256dh, auth) values (''https://push.example/x'', ' || quote_literal(:T1) || ', ''k'', ''a'')');
+select t.ok('S2 gets a calendar token', t.rows('insert into calendar_tokens default values') = 1);
+select t.ok('token is long and random', (select length(token) from calendar_tokens) = 64);
+select t.ok('S2 sets own time zone', t.rows('update profiles set timezone = ''Europe/Paris'' where id = ' || quote_literal(:S2)) = 1);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('T1 cannot see S2 devices', (select count(*) from push_subscriptions) = 0);
+select t.ok('T1 cannot see S2 calendar token', (select count(*) from calendar_tokens) = 0);
+select t.ok('T1 cannot read the notification log', (select count(*) from notification_log) = 0);
+reset role;
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');
 select t.err('anon cannot read sessions', 'select count(*) from athlete_docs');
 select t.err('anon cannot read messages', 'select count(*) from messages');
+select t.err('anon cannot read calendar tokens', 'select count(*) from calendar_tokens');
 reset role;

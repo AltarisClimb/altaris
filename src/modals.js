@@ -5,7 +5,7 @@ import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
 import { FONT, SPORT, fontLabel } from "./domain/grades.js";
 import { sessionLoad } from "./domain/workload.js";
-import { LI, fmtDateLong, fmtNum, t } from "./i18n/index.js";
+import { LANG, LI, fmtDateLong, fmtNum, t } from "./i18n/index.js";
 import { body } from "./main.js";
 import { topo } from "./ui/brand.js";
 import { Modal, toast } from "./ui/feedback.js";
@@ -209,6 +209,7 @@ function blockEditor(userId, date, editId){
           exercises: Array.from(picked), status: (ex && ex.status) || "planned"
         }));
         audit(ex ? "session_updated" : "session_assigned", title);
+        Remote.notify({ kind: "session", athleteId: userId, sessionId: id, update: !!ex });
         Modal.close(); toast(t("g.saved"), "good");
       };
     }
@@ -440,6 +441,45 @@ function videoCheckModal(){
   });
 }
 
+/* ---------------- abonnement d'agenda (flux webcal privé) ----------------
+   Le lien est créé à la demande ; l'agenda du téléphone le relit tout seul. */
+async function calendarSubscribeModal(){
+  let https;
+  try{ https = await Remote.calendarFeedUrl(LANG); }
+  catch(e){ return toast(t("cal.subFailed"), "crit"); }
+  const webcal = https.replace(/^https:/, "webcal:");
+  const google = "https://calendar.google.com/calendar/render?cid=" + encodeURIComponent(webcal);
+  Modal.open({
+    title: t("cal.subTitle"),
+    body: '<div class="stack">' +
+      '<p style="line-height:1.6">' + esc(t("cal.subIntro")) + '</p>' +
+      '<div class="stack sm">' +
+        '<a class="btn pri wide" href="' + esc(webcal) + '">' + ic("cal") + esc(t("cal.subOpen")) + '</a>' +
+        '<a class="btn wide" href="' + esc(google) + '" target="_blank" rel="noopener noreferrer">' + ic("cal") + esc(t("cal.subGoogle")) + '</a>' +
+      '</div>' +
+      '<span class="unit"><input class="inp" id="cal-url" readonly value="' + esc(https) + '">' +
+        '<button class="u" id="cal-copy" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("cal.subCopy")) + '</button></span>' +
+      '<p class="dim tiny">' + esc(t("cal.subPrivate")) + '</p>' +
+    '</div>',
+    footer: '<button class="btn ghost" id="cal-reset">' + esc(t("cal.subReset")) + '</button>' +
+            '<button class="btn" data-c>' + esc(t("g.close")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      $("#cal-copy", root).onclick = async () => {
+        try{ await navigator.clipboard.writeText(https); }
+        catch(e){ $("#cal-url", root).select(); document.execCommand("copy"); }
+        toast(t("g.copied"), "good");
+      };
+      $("#cal-reset", root).onclick = async () => {
+        try{ await Remote.resetCalendarFeed(); }
+        catch(e){ return toast(t("cal.subFailed"), "crit"); }
+        toast(t("cal.subResetDone"), "good");
+        calendarSubscribeModal();
+      };
+    }
+  });
+}
+
 /* ---------------- consentement données de santé (RGPD art. 9) ----------------
    Demandé au moment où il sert (douleur, test). Refuser n'empêche pas d'utiliser
    l'appli : then() est appelé dans les deux cas, les données restent alors locales. */
@@ -472,4 +512,4 @@ function withHealthConsent(action){
   healthConsentModal(() => action());
 }
 
-export { accountEditModal, availModal, blockEditor, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };
+export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

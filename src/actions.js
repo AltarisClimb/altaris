@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
@@ -42,6 +42,17 @@ const ACTIONS = {
   "purge-demo": () => { if (confirm(t("ad.purgeConfirm"))) purgeDemo(); },
   "export-all": () => saveFile("altaris-export-" + today() + ".json", JSON.stringify(exportPayload("all"), null, 2)),
   /* Séances à venir → fichier .ics (rappel 1 h avant), à ouvrir avec l'agenda du téléphone. */
+  "cal-subscribe": () => calendarSubscribeModal(),
+  /* Notifications : l'autorisation est demandée ici, suite à un geste de l'utilisateur (exigé par iOS). */
+  "push-on": async () => {
+    try{ await Remote.enablePush(); toast(t("nt.enabled"), "good"); }
+    catch(e){ toast(t(Notification.permission === "denied" ? "nt.denied" : "nt.failed"), "crit"); }
+    View.pushState = await Remote.pushState(); render();
+  },
+  "push-off": async () => {
+    try{ await Remote.disablePush(); }catch(e){}
+    View.pushState = await Remote.pushState(); render();
+  },
   "cal-export": (v) => {
     const me = Session.live();
     const u = (v && Access.canSee(v) && Store.get("users", v)) || me;
@@ -265,6 +276,7 @@ document.addEventListener("drop", async (e) => {
   $$(".day.drop").forEach(x => x.classList.remove("drop"));
   if (!s || s.date === date) return;
   await Store.put("sessions", s.id, Object.assign({}, s, { date }));
+  Remote.notify({ kind: "session", athleteId: s.userId, sessionId: s.id, update: true });
   audit("session_moved", s.title + " → " + date);
   toast(t("g.saved"), "good");
 });

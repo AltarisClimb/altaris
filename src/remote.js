@@ -5,7 +5,13 @@
    rattachement coach. Le reste des collections reste dans Store (local).
    Le schéma dit admin/teacher/student, l'interface admin/coach/climber :
    la traduction se fait uniquement dans ce fichier. */
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
+import { SUPABASE_ANON_KEY, SUPABASE_URL, VAPID_PUBLIC_KEY } from "./config.js";
+
+/** Clé VAPID (base64url) → octets, pour pushManager.subscribe. */
+function b64urlToBytes(s){
+  const b = atob(s.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((s.length + 3) % 4));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
 
 /** Version du texte de consentement santé affiché (à changer si le texte change). */
 const HEALTH_CONSENT_VERSION = "v1";
@@ -35,7 +41,9 @@ function fromProfile(p){
     status: p.status,
     coachId: p.teacher_id || null,
     createdAt: p.created_at ? Date.parse(p.created_at) : Date.now(),
-    healthConsentAt: p.health_consent_at ? Date.parse(p.health_consent_at) : null
+    healthConsentAt: p.health_consent_at ? Date.parse(p.health_consent_at) : null,
+    timezone: p.timezone || null,
+    lang: p.lang || null
   };
 }
 
@@ -98,7 +106,7 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at");
+      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang");
     if (error) throw error;
     return data.map(fromProfile);
   },
@@ -201,6 +209,61 @@ const Remote = {
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
     if (error) throw error;
     if (!data.length) throw new Error("consent update not permitted");
+  },
+
+  /* ---------- notifications (Web Push) ---------- */
+  /** Prévenir l'autre côté (Edge Function notify). Sans attente ni erreur visible : c'est un bonus. */
+  notify(payload){
+    if (!this.client || !VAPID_PUBLIC_KEY) return;
+    this.client.functions.invoke("notify", { body: payload }).catch(() => {});
+  },
+  /** "on" | "off" | "denied" | "unsupported" (sur iPhone : appli non ajoutée à l'écran d'accueil). */
+  async pushState(){
+    if (!VAPID_PUBLIC_KEY || !("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return "unsupported";
+    if (Notification.permission === "denied") return "denied";
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    return sub ? "on" : "off";
+  },
+  async enablePush(){
+    if (await Notification.requestPermission() !== "granted") throw new Error("permission");
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64urlToBytes(VAPID_PUBLIC_KEY) });
+    const j = sub.toJSON();
+    const { error } = await this.client.from("push_subscriptions")
+      .upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }, { onConflict: "endpoint" });
+    if (error) throw error;
+  },
+  async disablePush(){
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = reg && await reg.pushManager.getSubscription();
+    if (!sub) return;
+    await this.client.from("push_subscriptions").delete().eq("endpoint", sub.endpoint);
+    await sub.unsubscribe();
+  },
+
+  /* ---------- abonnement d'agenda (Edge Function calendar) ---------- */
+  /** Adresse privée du flux de séances ; créée à la première demande. */
+  async calendarFeedUrl(lang){
+    let { data } = await this.client.from("calendar_tokens").select("token").maybeSingle();
+    if (!data){
+      const r = await this.client.from("calendar_tokens").insert({}).select("token").single();
+      if (r.error) throw r.error;
+      data = r.data;
+    }
+    return SUPABASE_URL + "/functions/v1/calendar?t=" + data.token + (lang === "en" ? "&lang=en" : "");
+  },
+  /** Nouveau lien : l'ancien cesse de fonctionner (lien partagé par erreur, téléphone perdu…). */
+  async resetCalendarFeed(){
+    await this.client.from("calendar_tokens").delete().neq("token", "");
+  },
+
+  /** Fuseau et langue de l'appareil, pour les rappels et le texte des notifications. */
+  async saveDeviceInfo(user, lang){
+    let tz = null;
+    try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null; }catch(e){}
+    if (!user || (user.timezone === tz && user.lang === lang)) return;
+    await this.client.from("profiles").update({ timezone: tz, lang }).eq("id", user.id);
   },
 
   async updateProfile(id, patch){

@@ -96,6 +96,9 @@ async function loadExercises(){
 /* boot */
 (async function boot(){
   document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR");
+  /* Ouverture depuis une notification : /?tab=messages, /?tab=calendar… */
+  const wantTab = new URLSearchParams(location.search).get("tab");
+  if (wantTab && !new URLSearchParams(location.search).get("token_hash")) history.replaceState(null, "", location.pathname + location.hash);
   await Store.init();
   if (Remote.enabled()){
     setExercises([]);                    // la bibliothèque vient du serveur, pas de la banque intégrée
@@ -113,7 +116,8 @@ async function loadExercises(){
     Session.restore();
   }
   const me = Session.live();
-  if (me) View.tab = TABS[me.role][0][0];
+  if (me) View.tab = wantTab && ((TABS[me.role]||[]).some(x => x[0] === wantTab) || HIDDEN_TABS.includes(wantTab))
+    ? wantTab : TABS[me.role][0][0];
   render();
 })();
 

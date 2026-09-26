@@ -175,6 +175,56 @@ modèles dont les liens pointent vers le site :
 `{{ .SiteURL }}/?token_hash={{ .TokenHash }}&type=email` (inscription),
 `type=recovery` (mot de passe), `type=invite` (invitation).
 
+### Notifications et abonnement d'agenda (Edge Functions)
+
+Trois fonctions dans `supabase/functions/` :
+
+| Fonction | Rôle | Appelée par |
+|---|---|---|
+| `notify` | notification « nouveau message » / « nouvelle séance » à l'autre côté | l'appli, juste après l'envoi (jeton de l'utilisateur) |
+| `remind` | rappel 1 h avant chaque séance prévue avec une heure | `pg_cron` toutes les 5 min (secret partagé) |
+| `calendar` | flux d'agenda privé (`webcal://…?t=<jeton>`) | l'agenda du téléphone, sans connexion |
+
+Mise en place, une fois (depuis le dossier du dépôt) :
+
+```bash
+npx supabase init                      # crée supabase/config.toml si absent
+npx supabase login
+npx supabase link --project-ref bunfdvzedeosliwylbzn
+npx web-push generate-vapid-keys       # note la clé publique et la clé privée
+npx supabase secrets set VAPID_PUBLIC_KEY=<publique> VAPID_PRIVATE_KEY=<privée> \
+  VAPID_SUBJECT=mailto:contact@altaris-climb.com CRON_SECRET=<longue chaîne aléatoire> \
+  SITE_URL=https://<adresse du site>
+npx supabase functions deploy notify
+npx supabase functions deploy calendar --no-verify-jwt
+npx supabase functions deploy remind --no-verify-jwt
+```
+
+Puis la clé **publique** dans `src/config.js` (`VAPID_PUBLIC_KEY`) — jamais la
+privée. Tant qu'elle est vide, l'appli n'affiche pas les notifications.
+
+Le rappel toutes les 5 minutes, dans le SQL Editor (remplacer le secret) :
+
+```sql
+create extension if not exists pg_cron;
+create extension if not exists pg_net;
+select cron.schedule('altaris-remind', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://bunfdvzedeosliwylbzn.supabase.co/functions/v1/remind',
+    headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<CRON_SECRET>'),
+    body := '{}'::jsonb)
+$$);
+```
+
+À savoir :
+- **iPhone** : les notifications ne marchent que si ALTARIS est ajouté à
+  l'écran d'accueil (Partager → Sur l'écran d'accueil), iOS 16.4 ou plus.
+- Le rappel 1 h avant ne part que pour une séance **avec une heure** (champ
+  Heure de la fiche de séance), à l'heure locale du grimpeur (fuseau enregistré
+  à la connexion).
+- Le lien d'agenda est personnel : qui l'a voit les séances. Le grimpeur peut
+  le réinitialiser depuis la fenêtre d'abonnement.
+
 ### Reste à migrer
 
 Les séances passent par la table générique `athlete_docs` (une ligne par
