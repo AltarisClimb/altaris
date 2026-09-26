@@ -16,6 +16,8 @@ scripts/test-db.sh                    # Supabase RLS tests against a throwaway l
 node scripts/build-seed.mjs           # regenerate supabase/seed.sql from src/domain/exercises.js
 ```
 
+CI (`.github/workflows/ci.yml`) runs all of the above on every push to `main` and every PR, plus `node --check` on each module and a check that `supabase/seed.sql` matches the exercise bank.
+
 The service worker caches the app shell; hard-refresh or unregister it when iterating locally.
 
 ## Two rules the code depends on

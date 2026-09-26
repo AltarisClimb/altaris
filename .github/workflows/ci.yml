@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: npm test
+
+      # Views and actions have no unit tests; this at least catches syntax errors in every module.
+      - name: Syntax-check modules
+        run: find src scripts -name '*.js' -o -name '*.mjs' | xargs -n1 node --check
+
+      - name: Seed is up to date with the exercise bank
+        run: |
+          node scripts/build-seed.mjs
+          git diff --exit-code supabase/seed.sql || { echo "::error::supabase/seed.sql is stale — run: node scripts/build-seed.mjs"; exit 1; }
+
+  database:
+    name: RLS tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Put Postgres binaries on PATH
+        run: |
+          if ! ls -d /usr/lib/postgresql/*/bin >/dev/null 2>&1; then
+            sudo apt-get update -q && sudo apt-get install -yq postgresql
+          fi
+          ls -d /usr/lib/postgresql/*/bin | sort -V | tail -1 >> "$GITHUB_PATH"
+
+      - name: Migrations + RLS policies
+        run: scripts/test-db.sh
