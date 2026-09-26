@@ -12,7 +12,12 @@ const LS_KEY = "altaris.cache.v1";
 const LS_Q   = "altaris.queue.v1";
 /* Collections stockées dans Supabase (table athlete_docs) quand le projet est
    configuré. Les autres restent sur l'appareil pour l'instant. */
-const REMOTE_COLS = ["sessions"];
+const REMOTE_COLS = ["sessions", "assessments", "pain"];
+/* Données de santé (RGPD art. 9) : envoyées seulement si le grimpeur a donné
+   son consentement explicite ; le serveur le vérifie aussi (RLS). */
+const HEALTH_COLS = ["assessments", "pain"];
+/** Consentement santé : sans objet en mode local (rien ne quitte l'appareil). */
+function hasHealthConsent(u){ return !Remote.client || !!(u && u.healthConsentAt); }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Ligne athlete_docs → document de l'application. */
 function fromDocRow(r){ return Object.assign({}, r.data, { id: r.id, userId: r.athlete_id }); }
@@ -115,7 +120,11 @@ const Store = {
     this.data[col][id] = doc;
     this.saveLocal();
     if (!this.silent) requestRender();
-    if (Remote.client && REMOTE_COLS.includes(col)) return this._putRemote(col, id, doc);
+    if (Remote.client && REMOTE_COLS.includes(col)){
+      /* Santé sans consentement : reste sur l'appareil, envoyée si l'accord est donné. */
+      if (HEALTH_COLS.includes(col) && !hasHealthConsent(this.get("users", doc.userId))) return true;
+      return this._putRemote(col, id, doc);
+    }
     if (this.mode !== "cloud" || !this.db){ this._enqueue({ op:"set", col, id, doc }); return true; }
     try{
       const body = Object.assign({}, doc); delete body.id;
@@ -188,14 +197,21 @@ const Store = {
       let adopted = false;
       try{ adopted = !!localStorage.getItem(flag); }catch(e){}
       if (!adopted){
+        let waiting = false;                     // données de santé sans consentement : on réessaiera plus tard
         for (const d of Object.values(this.data[col] || {})){
           if (next[d.id] || !UUID.test(d.userId || "") || !Access.canSee(d.userId)) continue;
+          if (HEALTH_COLS.includes(col) && !hasHealthConsent(this.get("users", d.userId))){ waiting = true; continue; }
           if (await this._putRemote(col, d.id, d)) next[d.id] = d;
         }
-        try{ localStorage.setItem(flag, "1"); }catch(e){}
+        if (!waiting) try{ localStorage.setItem(flag, "1"); }catch(e){}
       }
       this.queue.filter(q => q.remote && q.col === col)
         .forEach(q => { if (q.op === "del") delete next[q.id]; else next[q.id] = q.doc; });
+      /* Santé sans consentement : absente du serveur par construction, on garde la copie locale. */
+      if (HEALTH_COLS.includes(col))
+        Object.values(this.data[col] || {}).forEach(d => {
+          if (!next[d.id] && !hasHealthConsent(this.get("users", d.userId))) next[d.id] = d;
+        });
       this.data[col] = next;
     }
     await this.syncMessages();
@@ -231,6 +247,30 @@ const Store = {
     try{ this.addMessage(await Remote.sendMessage(athleteId, msg)); return true; }
     catch(e){ toast(t(isNetworkError(e) ? "er.offline" : "er.saveFailed"), "crit"); return false; }
   },
+  /* ---------- consentement santé (RGPD art. 9) ---------- */
+  /** Le grimpeur connecté donne son accord ; ses tests et douleurs locaux partent ensuite. */
+  async giveHealthConsent(){
+    await Remote.setHealthConsent(true);
+    const me = this.get("users", Session.user.id);
+    this.data.users[me.id] = Object.assign({}, me, { healthConsentAt: Date.now() });
+    this.saveLocal();
+    audit("health_consent_given", "");
+    await this.syncRemote();
+  },
+  /** Retrait : le serveur efface tests et journal de douleur ; on les retire aussi d'ici. */
+  async withdrawHealthConsent(){
+    await Remote.setHealthConsent(false);
+    const me = this.get("users", Session.user.id);
+    this.data.users[me.id] = Object.assign({}, me, { healthConsentAt: null });
+    for (const col of HEALTH_COLS){
+      for (const d of Object.values(this.data[col] || {})) if (d.userId === me.id) delete this.data[col][d.id];
+      this.queue = this.queue.filter(q => !(q.col === col && q.doc && q.doc.userId === me.id));
+    }
+    this.saveLocal();
+    audit("health_consent_withdrawn", "");
+    requestRender();
+  },
+
   async markThreadRead(athleteId, ts){
     const th = this._thread(athleteId);
     th.read[Session.user.id] = ts;
@@ -256,7 +296,14 @@ const Store = {
    *  collections and unsent writes in the queue are kept — deleting them here
    *  would lose them for good. */
   clearRemote(userId){
-    REMOTE_COLS.forEach(c => { this.data[c] = {}; });
+    REMOTE_COLS.forEach(c => {
+      /* Données de santé d'un grimpeur sans consentement : jamais envoyées, donc
+         seulement ici. On les garde, sinon la déconnexion les perdrait. */
+      const keep = {};
+      if (HEALTH_COLS.includes(c))
+        Object.values(this.data[c] || {}).forEach(d => { if (!hasHealthConsent(this.get("users", d.userId))) keep[d.id] = d; });
+      this.data[c] = keep;
+    });
     this.data.threads = {};
     this.saveLocal();
     try{ if (userId) localStorage.removeItem("altaris.exercises." + userId); }catch(e){}
@@ -401,4 +448,4 @@ const Access = {
   }
 };
 
-export { Access, COLS, DEFAULT_CONFIG, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, fromMessageRow, isNetworkError, touch };
+export { Access, COLS, DEFAULT_CONFIG, HEALTH_COLS, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, fromMessageRow, hasHealthConsent, isNetworkError, touch };

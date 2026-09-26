@@ -7,6 +7,9 @@
    la traduction se fait uniquement dans ce fichier. */
 import { SUPABASE_ANON_KEY, SUPABASE_URL } from "./config.js";
 
+/** Version du texte de consentement santé affiché (à changer si le texte change). */
+const HEALTH_CONSENT_VERSION = "v1";
+
 const ROLE_IN  = { admin: "admin", teacher: "coach", student: "climber" };
 const ROLE_OUT = { admin: "admin", coach: "teacher", climber: "student" };
 
@@ -31,7 +34,8 @@ function fromProfile(p){
     role: ROLE_IN[p.role] || "climber",
     status: p.status,
     coachId: p.teacher_id || null,
-    createdAt: p.created_at ? Date.parse(p.created_at) : Date.now()
+    createdAt: p.created_at ? Date.parse(p.created_at) : Date.now(),
+    healthConsentAt: p.health_consent_at ? Date.parse(p.health_consent_at) : null
   };
 }
 
@@ -94,7 +98,7 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at");
+      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at");
     if (error) throw error;
     return data.map(fromProfile);
   },
@@ -188,6 +192,17 @@ const Remote = {
     if (error) throw error;
   },
 
+  /** Consentement RGPD art. 9 de l'utilisateur connecté (lui seul peut le donner ou le retirer).
+   *  Le retrait efface côté serveur ses tests et son journal de douleur. */
+  async setHealthConsent(on){
+    const id = await this.userId();
+    const patch = on ? { health_consent_at: new Date().toISOString(), health_consent_version: HEALTH_CONSENT_VERSION }
+                     : { health_consent_at: null, health_consent_version: null };
+    const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
+    if (error) throw error;
+    if (!data.length) throw new Error("consent update not permitted");
+  },
+
   async updateProfile(id, patch){
     /* Une ligne refusée par la RLS ne renvoie pas d'erreur, juste zéro ligne. */
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
@@ -227,4 +242,4 @@ const Remote = {
   }
 };
 
-export { Remote, fromProfile, profilePatch };
+export { HEALTH_CONSENT_VERSION, Remote, fromProfile, profilePatch };

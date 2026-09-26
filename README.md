@@ -82,10 +82,11 @@ Tout dépend de `src/config.js` :
 > (le coach planifie, le grimpeur valide) et **messagerie** grimpeur ↔ coach,
 > en direct.
 >
-> **Encore sur l'appareil :** tests, journal de douleur, routines, paramètres
-> et journal d'audit. Tant qu'ils ne sont pas
-> migrés (§5), le coach ne voit pas ces données chez ses athlètes et la
-> messagerie ne transmet rien.
+> **Tests et journal de douleur** sont aussi sur Supabase, **seulement si le
+> grimpeur a donné son accord** (données de santé, RGPD art. 9). Sans accord,
+> ils restent sur son appareil et ne sont pas partagés.
+>
+> **Encore sur l'appareil :** routines, paramètres et journal d'audit.
 
 ---
 
@@ -179,12 +180,18 @@ modèles dont les liens pointent vers le site :
 Les séances passent par la table générique `athlete_docs` (une ligne par
 document, lisible par le grimpeur, son coach et les admins, en temps réel).
 La messagerie a ses propres tables (`messages`, une ligne par message,
-non modifiable ; `message_reads` pour les non-lus). `assessments` · `pain`
-peuvent rejoindre `athlete_docs` : ajouter la
-collection au `check` de la table, à `REMOTE_COLS` dans `src/data.js`, et des
-cas dans `rls.sql`. `routines` · `config` · `audit` ne sont pas liés à un
-grimpeur et demanderont leurs propres tables. Ce sont des données de santé :
-voir la liste §7 avant.
+non modifiable ; `message_reads` pour les non-lus).
+
+**Données de santé** (`assessments`, `pain`) : dans `athlete_docs`, mais le
+serveur refuse de les écrire sans consentement du grimpeur
+(`profiles.health_consent_at`). Lui seul peut le donner ou le retirer ; le
+retrait efface ses tests et son journal de douleur du serveur. Côté appli,
+le consentement est demandé au moment de signaler une douleur ou de passer
+un test, et se gère dans le profil. Texte versionné : `HEALTH_CONSENT_VERSION`
+dans `src/remote.js` (à changer si le texte change).
+
+`routines` · `config` · `audit` ne sont pas liés à un grimpeur et
+demanderont leurs propres tables.
 
 ---
 
@@ -207,7 +214,9 @@ Rappel des points signalés lors de la livraison :
 
 - [x] Authentification réelle (Supabase Auth, e-mail + mot de passe)
 - [ ] RLS côté serveur — fait pour comptes, exercices et affectations ; reste les données d'entraînement et de santé (§5)
-- [ ] Consentement explicite RGPD article 9 pour les données de santé + AIPD
+- [x] Consentement explicite RGPD article 9 pour les données de santé (écran de consentement, retrait avec effacement)
+- [ ] AIPD (analyse d'impact) et registre des traitements
+- [ ] Les messages d'alerte douleur envoyés au coach restent dans la messagerie après un retrait de consentement
 - [ ] Politique de conservation et de suppression des données
 - [ ] Vérifier si l'hébergement de données de santé pour le compte de tiers déclenche la certification **HDS** en France
 - [ ] Unités impériales (livres, pouces) si le marché en-US est visé

@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
@@ -74,7 +74,15 @@ const ACTIONS = {
   validate: (v) => rpeModal(v),
   "block-new": (v, el) => blockEditor(v, el.dataset.d || null, null),
   "avail-edit": () => availModal(),
-  "pain-new": () => painModal(),
+  "pain-new": () => withHealthConsent(painModal),
+  /* Consentement santé, depuis le profil. */
+  "hc-give": () => healthConsentModal(() => render()),
+  "hc-withdraw": async () => {
+    if (!confirm(t("hc.withdrawConfirm"))) return;
+    try{ await Store.withdrawHealthConsent(); }
+    catch(e){ return toast(t("er.saveFailed"), "crit"); }
+    toast(t("hc.withdrawn"), "good");
+  },
   "pain-resolve": async (v) => {
     const p = Store.get("pain", v); if (!p) return;
     await Store.put("pain", v, Object.assign({}, p, { status:"resolved" }));
@@ -121,7 +129,7 @@ const ACTIONS = {
   },
   "onb-rmslot": (v) => { collectOnb(); View.onb.data.availability.splice(Number(v), 1); render(); },
   /* --- test runner --- */
-  "test-start": () => {
+  "test-start": () => withHealthConsent(() => {
     const me = Session.live(), p = me.profile || {};
     const battery = trackFor(p);
     /* Pre-fill what the profile already knows so the athlete types as little as possible at the wall. */
@@ -136,7 +144,7 @@ const ACTIONS = {
     });
     View.runner = { userId: me.id, battery, idx: 0, results };
     window.scrollTo(0,0); render();
-  },
+  }),
   "test-abort": () => { View.runner = null; render(); },
   "test-skip": () => {
     const r = View.runner, test = batteryFor(r.battery)[r.idx];

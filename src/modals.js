@@ -1,5 +1,5 @@
 import { $, $$, COPYRIGHT, esc, today, uid } from "./core.js";
-import { Access, Session, Store, audit } from "./data.js";
+import { Access, Session, Store, audit, hasHealthConsent } from "./data.js";
 import { Remote } from "./remote.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
@@ -254,13 +254,15 @@ function painModal(){
           status: "active", createdAt: Date.now() });
         audit("pain_reported", site + " EVA" + eva);
         const coach = Access.myCoach();
-        if (coach){
+        /* Le message au coach contient la douleur : seulement avec le consentement santé. */
+        const shared = hasHealthConsent(Session.live());
+        if (coach && shared){
           await sendMessage(me.id, coach.id, {
             ctx: t("pn.title"), text: painLabel(site) + " · " + t("pn.eva") + " " + eva + "/10 · " + t("pn.when."+$("#pn-when", root).value) +
               ($("#pn-ctx", root).value.trim() ? "\n" + $("#pn-ctx", root).value.trim() : "") });
         }
         Modal.close();
-        toast(t("pn.sent"), "good");
+        toast(shared ? t("pn.sent") : t("hc.localOnly"), shared ? "good" : undefined);
         if (["finger_a2","finger_a4","finger_other","elbow_med","elbow_lat","shoulder","wrist"].indexOf(site) >= 0)
           setTimeout(() => toast(t("pn.autoAdaptD"), "crit"), 700);
       };
@@ -438,4 +440,36 @@ function videoCheckModal(){
   });
 }
 
-export { accountEditModal, availModal, blockEditor, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal };
+/* ---------------- consentement données de santé (RGPD art. 9) ----------------
+   Demandé au moment où il sert (douleur, test). Refuser n'empêche pas d'utiliser
+   l'appli : then() est appelé dans les deux cas, les données restent alors locales. */
+function healthConsentModal(then){
+  const li = (k) => '<li style="margin:0 0 6px">' + esc(t(k)) + '</li>';
+  Modal.open({
+    title: t("hc.title"),
+    body: '<div class="stack">' +
+      '<p style="line-height:1.6">' + esc(t("hc.intro")) + '</p>' +
+      '<ul class="small muted" style="line-height:1.55;padding-left:18px;margin:0">' +
+        li("hc.what") + li("hc.who") + li("hc.keep") + li("hc.rights") + '</ul>' +
+    '</div>',
+    footer: '<button class="btn ghost" id="hc-no">' + esc(t("hc.decline")) + '</button>' +
+            '<button class="btn pri" id="hc-yes">' + ic("check") + esc(t("hc.accept")) + '</button>',
+    onMount(root){
+      $("#hc-no", root).onclick = () => { Modal.close(); if (then) then(false); };
+      $("#hc-yes", root).onclick = async () => {
+        try{ await Store.giveHealthConsent(); }
+        catch(e){ return toast(t("er.saveFailed"), "crit"); }
+        Modal.close(); toast(t("hc.thanks"), "good");
+        if (then) then(true);
+      };
+    }
+  });
+}
+/** Lance action() après avoir demandé le consentement s'il manque (grimpeur en mode Supabase). */
+function withHealthConsent(action){
+  const me = Session.live();
+  if (!me || me.role !== "climber" || hasHealthConsent(me)) return action();
+  healthConsentModal(() => action());
+}
+
+export { accountEditModal, availModal, blockEditor, healthConsentModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

@@ -83,8 +83,44 @@ test("suppression : retirée du serveur", async () => {
 });
 
 test("les autres collections restent locales", async () => {
-  await Store.put("pain", "p-1", { userId: ATH, eva: 3 });
+  await Store.put("routines", "r-1", { coachId: COACH, name: "Poutre" });
   assert.deepEqual(calls, []);
+});
+
+test("santé sans consentement : la douleur reste sur l'appareil", async () => {
+  assert.equal(await Store.put("pain", "p-1", { userId: ATH, eva: 3 }), true);
+  assert.deepEqual(calls, []);
+  assert.ok(Store.data.pain["p-1"]);
+});
+
+test("santé avec consentement : la douleur part sur le serveur", async () => {
+  Store.data.users[ATH] = Object.assign({}, Store.data.users[ATH], { healthConsentAt: Date.now() });
+  await Store.put("pain", "p-2", { userId: ATH, eva: 5 });
+  assert.deepEqual(calls, [["put", "p-2", ATH]]);
+});
+
+test("les douleurs saisies avant l'accord partent dès qu'il est donné", async () => {
+  Session.user = Store.data.users[ATH];
+  Store.data.pain["p-old"] = { id: "p-old", userId: ATH, eva: 2 };
+  await Store.syncRemote();
+  assert.equal(server["p-old"], undefined, "pas d'envoi sans accord");
+  Remote.setHealthConsent = async () => {};
+  Remote.messages = async () => []; Remote.reads = async () => [];
+  await Store.giveHealthConsent();
+  assert.ok(server["p-old"], "envoyée après l'accord");
+});
+
+test("retrait du consentement : tests et douleurs retirés de l'appareil", async () => {
+  Session.user = Store.data.users[ATH] = Object.assign({}, Store.data.users[ATH], { healthConsentAt: Date.now() });
+  Store.data.pain["p-3"] = { id: "p-3", userId: ATH };
+  Store.data.assessments["a-1"] = { id: "a-1", userId: ATH };
+  Store.data.sessions["s-5"] = { id: "s-5", userId: ATH };
+  Remote.setHealthConsent = async () => {};
+  await Store.withdrawHealthConsent();
+  assert.deepEqual(Store.data.pain, {});
+  assert.deepEqual(Store.data.assessments, {});
+  assert.ok(Store.data.sessions["s-5"], "les séances restent");
+  assert.equal(Store.data.users[ATH].healthConsentAt, null);
 });
 
 /* ---------------- messagerie ---------------- */
@@ -147,13 +183,13 @@ test("à la déconnexion, les données rendues par le serveur sont effacées de 
   Remote.signOut = async () => {};
   Store.data.sessions["s-1"] = { id: "s-1", userId: ATH };
   Store.data.threads[ATH] = { id: ATH, messages: [{ id: "m-1", text: "salut" }] };
-  Store.data.pain["p-1"] = { id: "p-1", userId: ATH };               // encore local uniquement
+  Store.data.pain["p-1"] = { id: "p-1", userId: ATH };               // sans consentement : jamais envoyée
   Store.queue = [{ op: "set", col: "sessions", id: "s-2", doc: { id: "s-2", userId: ATH }, remote: true }];
   try{
     Session.signOut();
     assert.deepEqual(Store.data.sessions, {});
     assert.deepEqual(Store.data.threads, {});
-    assert.ok(Store.data.pain["p-1"], "les données encore locales ne doivent pas être perdues");
+    assert.ok(Store.data.pain["p-1"], "une douleur jamais envoyée (pas de consentement) ne doit pas être perdue");
     assert.ok(Store.queue.some(q => q.id === "s-2"), "une écriture non envoyée reste en file");
     assert.ok(removed.includes("altaris.exercises." + COACH));
   } finally {

@@ -113,7 +113,7 @@ reset role;
 select t.as(:T1); set role authenticated;
 select t.ok('T1 plans a session for own student S2', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-1'', ' || quote_literal(:S2) || ', ''{"title":"Force"}'')') = 1);
 select t.err('T1 cannot plan for S1 (not theirs)', 'insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-2'', ' || quote_literal(:S1) || ', ''{}'')');
-select t.err('unknown collection is rejected', 'insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-1'', ' || quote_literal(:S2) || ', ''{}'')');
+select t.err('unknown collection is rejected', 'insert into athlete_docs (col, id, athlete_id, data) values (''threads'', ''x-1'', ' || quote_literal(:S2) || ', ''{}'')');
 select t.ok('updated_by is stamped with the writer', (select updated_by from athlete_docs where id = 's-1') = :T1);
 reset role;
 select t.as(:S2); set role authenticated;
@@ -157,6 +157,29 @@ reset role;
 select t.as(:T2); set role authenticated;
 select t.ok('suspended T2 sees no messages', (select count(*) from messages) = 0);
 reset role;
+
+-- ================= health data (GDPR art. 9 consent)
+-- Still: S1's coach is A (admin), S2's coach is T1.
+select t.as(:S2); set role authenticated;
+select t.err('no consent: S2 cannot log pain', 'insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-1'', ' || quote_literal(:S2) || ', ''{"eva":3}'')');
+select t.ok('S2 gives consent', t.rows('update profiles set health_consent_at = now(), health_consent_version = ''v1'' where id = ' || quote_literal(:S2)) = 1);
+select t.ok('with consent: S2 logs pain', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-1'', ' || quote_literal(:S2) || ', ''{"eva":3}'')') = 1);
+select t.ok('with consent: S2 saves an assessment', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''assessments'', ''a-1'', ' || quote_literal(:S2) || ', ''{}'')') = 1);
+select t.ok('S2 still has a session doc for later', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-9'', ' || quote_literal(:S2) || ', ''{}'')') = 1);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('T1 sees S2 pain log', (select count(*) from athlete_docs where col = 'pain' and athlete_id = :S2) = 1);
+select t.ok('T1 cannot consent for S2 (row not writable)', t.rows('update profiles set health_consent_at = null where id = ' || quote_literal(:S2)) = 0);
+reset role;
+select t.as(:A); set role authenticated;
+select t.err('admin cannot consent for S1', 'update profiles set health_consent_at = now() where id = ' || quote_literal(:S1));
+select t.err('admin cannot write S1 health data without S1 consent', 'insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-2'', ' || quote_literal(:S1) || ', ''{}'')');
+reset role;
+select t.as(:S2); set role authenticated;
+select t.ok('S2 withdraws consent', t.rows('update profiles set health_consent_at = null where id = ' || quote_literal(:S2)) = 1);
+reset role;
+select t.ok('withdrawal erased S2 health data', (select count(*) from athlete_docs where athlete_id = :S2 and col in ('pain', 'assessments')) = 0);
+select t.ok('withdrawal kept S2 sessions', (select count(*) from athlete_docs where athlete_id = :S2 and col = 'sessions') = 1);
 
 -- ================= anon
 select t.as(null); set role anon;

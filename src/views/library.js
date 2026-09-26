@@ -3,7 +3,7 @@ import { Access, Session, Store, audit, config } from "../data.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
 import { latestAssessment } from "../domain/scoring.js";
-import { LI, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
+import { LI, LOC, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
 import { body, render } from "../main.js";
 import { Remote } from "../remote.js";
 import { topo } from "../ui/brand.js";
@@ -303,6 +303,17 @@ function viewProfile(me){
     (p.goalText ? '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("pf.goals")) + '</span>' +
       '<p style="font-family:var(--serif);font-size:19px;line-height:1.4">' + esc(p.goalText) + '</p>' +
       (p.goalDate ? '<span class="chip acc">' + esc(fmtDateLong(p.goalDate)) + '</span>' : '') + '</div>' : '') +
+
+    /* Consentement santé (RGPD art. 9) : état, et le donner ou le retirer à tout moment. */
+    (me.role === "climber" && Remote.client ? '<div class="panel pad stack sm">' +
+      '<span class="eyebrow">' + esc(t("hc.title")) + '</span>' +
+      '<p class="small muted">' + esc(me.healthConsentAt
+        ? t("hc.given", { date: new Date(me.healthConsentAt).toLocaleDateString(LOC(), { day: "numeric", month: "long", year: "numeric" }) })
+        : t("hc.none")) + '</p>' +
+      '<div class="row tight noprint">' + (me.healthConsentAt
+        ? '<button class="btn sm ghost" data-act="hc-withdraw">' + esc(t("hc.withdraw")) + '</button>'
+        : '<button class="btn sm pri" data-act="hc-give">' + ic("shield") + esc(t("hc.give")) + '</button>') + '</div>' +
+    '</div>' : '') +
 
     (me.role === "climber" ? '<div class="panel pad stack sm">' +
       '<div class="between"><span class="eyebrow">' + esc(t("pn.title")) + '</span>' +
