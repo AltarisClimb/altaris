@@ -4,66 +4,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-ALTARIS™ Pro Platform — a climbing performance/training analytics app for climbers, coaches, and admins. It is a **single HTML file** (`index.html`, ~4850 lines): vanilla JS, no build step, no npm dependencies, no framework. The only external resource is a Google Fonts stylesheet; everything else (CSS, JS, SVG icons, exercise data) is inlined in `index.html`.
+ALTARIS™ Pro Platform — climbing performance/training app. Vanilla JS split into **native ES modules** under `src/`, loaded directly by the browser from `index.html` (a thin shell). No build step, no bundler, no npm dependencies — `package.json` exists only to run tests. Keep it that way unless explicitly asked.
 
-Do not introduce a bundler, framework, or npm dependency without being explicitly asked — the zero-build, single-file nature is a deliberate architectural choice (see README.md §6), not an oversight.
+## Commands
 
-## Running / testing locally
+```bash
+npm test                              # node --test, all tests in tests/
+node --test tests/workload.test.js    # a single test file
+npm run serve                         # http://localhost:8080 (ES modules need HTTP; file:// won't work)
+scripts/test-db.sh                    # Supabase RLS tests against a throwaway local Postgres
+node scripts/build-seed.mjs           # regenerate supabase/seed.sql from src/domain/exercises.js
+```
 
-There is no build or test tooling in this repo (no `package.json`). To work on the app:
+The service worker caches the app shell; hard-refresh or unregister it when iterating locally.
 
-- Open `index.html` directly in a browser, or serve the directory statically (e.g. `python3 -m http.server`) since the service worker only registers over `http(s)`, not `file://`.
-- There is no automated test suite. Verify changes manually in the browser against the relevant role (climber / coach / admin) and check both `fr` and `en` (`LANG` toggle in the top bar).
-- The service worker (`sw.js`) caches the app shell; when iterating on `index.html`, hard-refresh or unregister the SW to avoid seeing stale content.
+## Two rules the code depends on
 
-## Supabase backend (in progress)
-
-The app is migrating from the Claude-artifact/localStorage `Store` to Supabase. Target roles: `admin`, `teacher`, `student` (the current UI still says admin/coach/climber).
-
-- `supabase/migrations/` — schema + Row Level Security. **Permissions live here, not in the client.** Any change to who-can-see-what must be a policy change plus a test.
-- `supabase/seed.sql` — generated; regenerate with `node scripts/build-seed.mjs` (extracts the exercise bank from `index.html`).
-- `scripts/test-db.sh` — spins up a throwaway local Postgres, applies migrations + seed, runs `supabase/tests/rls.sql`. Exits non-zero on any `FAIL`. `supabase/tests/auth_stub.sql` fakes Supabase's `auth` schema and roles for this.
+1. **Every file added under `src/` must be listed in `PRECACHE` in `sw.js`**, or offline mode breaks silently. `tests/precache.test.js` enforces this.
+2. **`data.js` and `domain/` must never import `views/` or `actions.js`.** That keeps business logic testable under Node. When the data layer needs a re-render it calls `requestRender()` from `bus.js`, which `main.js` wires to the real `render()` at boot.
 
 ## Architecture
 
-`index.html` is organized into numbered sections, each wrapped in its own `<script>` tag (search for `/* ===... N. SECTION NAME ===... */`):
+- `src/main.js` — boot + `render()`. Imports `actions.js` for its side effects (it registers all event listeners); removing that import leaves a UI that ignores clicks.
+- **Rendering is a full re-render**: `render()` rebuilds `#app.innerHTML` from string-returning view functions (`src/views/*`), then restores scroll and focus (inputs carry `data-fk`). No virtual DOM, no components.
+- **Interaction is delegated**: `document`-level listeners in `src/actions.js` match `[data-act]` (click), `[data-act-input]`, `[data-act-change]` and dispatch to the `ACTIONS` map. New control = `data-act="name" data-v="..."` in markup + an `ACTIONS` entry.
+- **UI-only state** (current tab, selected athlete, filters, onboarding/test-runner progress) lives in `View` (`src/views/shell.js`); role → tabs mapping is `TABS` there.
+- **Persistence** is `src/data.js`: `Store` (`init`/`list`/`get`/`put`/`del`, collections in `COLS`), `Session`, `Access` (RBAC), `audit()`, `config()`. `Store` tries the Claude artifact DB (`claude.use("db")`) and falls back to `localStorage` with a write queue — "Mode local" in the footer is expected outside that runtime. This module is the seam being replaced by Supabase.
+- `Access` checks are **client-side only**; they are not a security boundary. Real permissions live in the Supabase RLS policies (below).
+- `Session.live()` re-reads the user from `Store`; prefer it over `Session.user`.
+- **i18n**: `src/i18n/fr-FR.js` and `en-US.js` are flat key → string maps; `t(key, vars)` from `src/i18n/index.js`. Every user-facing string goes through `t()`, and both files must get the key.
+- `src/domain/` — pure logic: grades, scoring/level routing, workload (session-RPE load, ACWR rolling-average and EWMA, monotony/strain), exercise bank (`"FR|EN"` strings per field).
 
-1. Internationalization — `DICT` (a flat `key -> [fr, en]` map), `t(key, vars)`, `setLang`, locale-aware `fmt*` helpers. **Every user-facing string goes through `DICT`/`t()`** — there is no third language and no fallback to raw strings.
-2. Persistence layer — `Store` (see below), `Access` (RBAC), `Session`, `audit()`.
-3. Climbing domain model — grade scales, level routing, test protocols/scoring.
-4. Workload analytics — session load (Foster session-RPE), ACWR, monotony/strain.
-5. Exercise bank — bilingual (`"FR|EN"` field strings) reference data.
-6–8. Identity assets (inlined SVG logo), UI primitives (icons/toasts/modals), charts (theme-token colors only).
-9. `View` (in-memory UI state) + shell chrome (topbar, tab bar, footer).
-10–19. Auth, onboarding, and one section per role-facing screen (climber overview/calendar/tests/exercises/messages/profile; coach command center/planning; admin accounts/pairings/params/audit).
-20. Modals.
-21. Export (JSON export of all data or "mine").
-22. Demonstration dataset (`seedDemo`/`purgeDemo`).
-23. Action dispatch — the `ACTIONS` table.
-24. Render & boot.
+## Supabase backend (in progress)
 
-### Data flow / rendering model
+Target roles: `admin`, `teacher`, `student` (the UI still says admin/coach/climber).
 
-There is no virtual DOM and no component framework. The whole app is one full re-render on every state change:
+- `supabase/migrations/` — schema + Row Level Security. Tables: `profiles` (role, status, `teacher_id` set by admins only), `exercises` (`visibility` is `free` = everyone, or `library` = teachers/admins, students only via assignment; only admins publish `free`), `assignments` (teacher → own students). Any change to who-can-see-what is a policy change **plus** a case in `supabase/tests/rls.sql`.
+- `supabase/seed.sql` is generated — don't edit by hand.
+- `supabase/tests/auth_stub.sql` fakes Supabase's `auth` schema and roles for local tests only; never apply it to a real project.
 
-- `render()` sets `#app.innerHTML` from `watermark() + topbar() + body() + legalFooter()`, then restores scroll position and focus (via `data-fk` on inputs).
-- View functions (e.g. `viewOverview`, `viewCalendar`) are pure string-builders returning HTML; there's no diffing.
-- All user interaction is delegated through `document.addEventListener("click"/"input"/"change"/"drag*", ...)` matching `[data-act]`, `[data-act-input]`, `[data-act-change]` attributes, dispatching into the `ACTIONS` map (section 23). To add a new interactive control, add a `data-act="name"` (optionally `data-v="value"`) to the markup and a handler in `ACTIONS`.
-- Mutable UI-only state (current tab, selected athlete, calendar week, filters, in-progress onboarding/test-runner state) lives in the global `View` object, not in `Store`.
+## Constraints from README
 
-### Persistence (`Store`, section 2)
-
-- `COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "config", "audit"]` — the full list of collections. Data shape is `Store.data[col][id] = doc`.
-- `Store.init()` tries `claude.use("db")` (the Claude artifact runtime's database). If unavailable, the app **automatically falls back to `mode: "local"`**, persisting to `localStorage` (`altaris.cache.v1`) with a write queue (`altaris.queue.v1`) that flushes when connectivity/cloud returns. This local-mode fallback is intentional and load-bearing — don't "fix" it by requiring a backend.
-- In cloud mode, each collection is a live `onSnapshot` subscription; writes go through `Store.put(col, id, obj)` / `Store.del(col, id)`, which are optimistic (write local + render immediately) and queue on failure.
-- `Store.mode === "local"` is surfaced to the user in the footer ("Mode local"); this is expected, not a bug, when running outside the Claude artifact runtime (e.g. on Vercel/Cloudflare/GitHub Pages — see README.md §2 for the full implication: no cross-browser sync in local mode).
-- RBAC (`Access` object) is enforced **client-side only** — `Access.climbers()`, `Access.canSee()`, `Access.scoped()` gate what a coach/climber/admin can see in the UI, but there is no server to enforce this. Don't treat client-side `Access` checks as a real security boundary; see README.md §5 and §7 for the planned Supabase + Row Level Security migration.
-- To swap in a real backend, the persistence surface to replace is exactly `Store`'s five methods (`init`, `list`, `get`, `put`, `del`) — see README.md §5.
-
-### Roles
-
-Three roles drive both `TABS` (nav) and `Access`: `climber`, `coach`, `admin`. Role-specific screens live in their own numbered sections (12–19). `Session.live()` always re-reads the current user doc from `Store` rather than trusting the cached sign-in snapshot — use that pattern (not `Session.user` directly) when you need up-to-date profile/status data.
-
-## Deployment
-
-See `README.md` for full deployment details (Vercel/Cloudflare/GitHub Pages, headers via `vercel.json`, the Supabase migration path, and the pre-launch checklist in README §7 — auth, RLS, GDPR consent, data retention). Notably: this app **must not carry quantified injury-risk-reduction claims** (README §7, last item) — keep that in mind when touching any copy in `DICT` related to training safety/outcomes.
+See `README.md` for deployment and the pre-launch checklist (real auth, RLS, GDPR art. 9 consent for health data, retention, HDS). Do not add quantified injury-risk-reduction claims anywhere in the copy.
