@@ -78,8 +78,11 @@ Tout dépend de `src/config.js` :
   `localStorage` du navigateur. Le pied de page affiche « Mode local ». Utile
   pour une démo hors ligne.
 
-> **Encore sur l'appareil, même avec Supabase :** tests, séances, douleurs,
-> messages, routines, paramètres et journal d'audit. Tant qu'ils ne sont pas
+> **Déjà sur Supabase :** comptes, bibliothèque, affectations et **séances**
+> (le coach planifie, le grimpeur valide, en direct).
+>
+> **Encore sur l'appareil :** tests, douleurs, messages, routines, paramètres
+> et journal d'audit. Tant qu'ils ne sont pas
 > migrés (§5), le coach ne voit pas ces données chez ses athlètes et la
 > messagerie ne transmet rien.
 
@@ -145,7 +148,7 @@ qui inclut Londres et Zurich.
 |---|---|
 | Schéma + RLS (`profiles`, `exercises`, `assignments`) | `supabase/migrations/` |
 | Tests des droits d'accès | `supabase/tests/rls.sql` — `scripts/test-db.sh`, et la CI à chaque push |
-| Client (connexion, profils, exercices, affectations) | `src/remote.js`, client vendorisé `src/vendor/supabase.js` |
+| Client (connexion, profils, exercices, affectations, séances) | `src/remote.js`, client vendorisé `src/vendor/supabase.js` |
 | Clé et URL du projet | `src/config.js` (clé publiable uniquement, jamais `service_role`) |
 | Banque d'exercices v2 (82 exercices × 3 variantes + silhouettes) | `node scripts/build-bank-v2.mjs <outil-entrainement-escalade.html>` → migration |
 
@@ -172,9 +175,12 @@ modèles dont les liens pointent vers le site :
 
 ### Reste à migrer
 
-`assessments` · `sessions` · `pain` · `threads` · `routines` · `config` ·
-`audit` sont encore dans `Store` (`src/data.js`). Chacun demande une table,
-ses politiques RLS et des cas dans `rls.sql`. Ce sont des données de santé :
+Les séances passent par la table générique `athlete_docs` (une ligne par
+document, lisible par le grimpeur, son coach et les admins, en temps réel).
+`assessments` · `pain` · `threads` peuvent la rejoindre : ajouter la
+collection au `check` de la table, à `REMOTE_COLS` dans `src/data.js`, et des
+cas dans `rls.sql`. `routines` · `config` · `audit` ne sont pas liés à un
+grimpeur et demanderont leurs propres tables. Ce sont des données de santé :
 voir la liste §7 avant.
 
 ---

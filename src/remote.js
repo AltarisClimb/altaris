@@ -132,6 +132,32 @@ const Remote = {
     await this.loadAssignments();
   },
 
+  /* ---------- documents par athlète (table athlete_docs) ---------- */
+  async docs(col){
+    const { data, error } = await this.client.from("athlete_docs").select("id, athlete_id, data").eq("col", col);
+    if (error) throw error;
+    return data;
+  },
+  async putDoc(col, id, athleteId, data){
+    const { error } = await this.client.from("athlete_docs")
+      .upsert({ col, id, athlete_id: athleteId, data }, { onConflict: "col,id" });
+    if (error) throw error;
+  },
+  async delDoc(col, id){
+    const { error } = await this.client.from("athlete_docs").delete().eq("col", col).eq("id", id);
+    if (error) throw error;
+  },
+  /** Changements en direct (Realtime applique la même RLS). onChange(col, id, row|null). */
+  watchDocs(onChange){
+    this.client.removeAllChannels();
+    this.client.channel("athlete_docs")
+      .on("postgres_changes", { event: "*", schema: "public", table: "athlete_docs" }, (p) => {
+        if (p.eventType === "DELETE") onChange(p.old.col, p.old.id, null);
+        else onChange(p.new.col, p.new.id, p.new);
+      })
+      .subscribe();
+  },
+
   async updateProfile(id, patch){
     /* Une ligne refusée par la RLS ne renvoie pas d'erreur, juste zéro ligne. */
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
@@ -165,7 +191,10 @@ const Remote = {
     this.recovery = false;
   },
 
-  async signOut(){ try{ await this.client.auth.signOut(); }catch(e){ /* déjà déconnecté ou hors ligne */ } }
+  async signOut(){
+    try{ this.client.removeAllChannels(); await this.client.auth.signOut(); }
+    catch(e){ /* déjà déconnecté ou hors ligne */ }
+  }
 };
 
 export { Remote, fromProfile, profilePatch };

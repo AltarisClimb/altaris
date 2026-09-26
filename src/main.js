@@ -110,6 +110,7 @@ async function loadExercises(){
     }catch(e){ toast(t("auth.remoteDown"), "crit"); }
     Remote.booting = false;
     loadExercises();
+    if (Session.user) Store.startRemote();
   } else {
     Session.restore();
   }

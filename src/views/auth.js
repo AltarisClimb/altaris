@@ -66,6 +66,7 @@ async function remoteSignIn(){
 function enter(u){
   Session.signIn(u);
   loadExercises();
+  Store.startRemote();
   View.tab = TABS[u.role][0][0];
   render();
 }

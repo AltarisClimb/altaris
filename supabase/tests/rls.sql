@@ -108,7 +108,32 @@ select t.as(:S1); set role authenticated;
 select t.ok('S1 sees own profile + admin coach', (select count(*) from profiles) = 2);
 reset role;
 
+-- ================= athlete documents (training sessions)
+-- At this point S1's coach is A (admin), S2's coach is T1, T2 is suspended.
+select t.as(:T1); set role authenticated;
+select t.ok('T1 plans a session for own student S2', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-1'', ' || quote_literal(:S2) || ', ''{"title":"Force"}'')') = 1);
+select t.err('T1 cannot plan for S1 (not theirs)', 'insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-2'', ' || quote_literal(:S1) || ', ''{}'')');
+select t.err('unknown collection is rejected', 'insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-1'', ' || quote_literal(:S2) || ', ''{}'')');
+select t.ok('updated_by is stamped with the writer', (select updated_by from athlete_docs where id = 's-1') = :T1);
+reset role;
+select t.as(:S2); set role authenticated;
+select t.ok('S2 sees the session planned for them', (select count(*) from athlete_docs) = 1);
+select t.ok('S2 validates it', t.rows('update athlete_docs set data = data || ''{"status":"done"}'' where id = ''s-1''') = 1);
+select t.err('S2 cannot hand it to S1', 'update athlete_docs set athlete_id = ' || quote_literal(:S1) || ' where id = ''s-1''');
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('S1 does not see S2 sessions', (select count(*) from athlete_docs) = 0);
+reset role;
+select t.as(:T2); set role authenticated;
+select t.ok('suspended T2 sees no sessions', (select count(*) from athlete_docs) = 0);
+reset role;
+select t.as(:A); set role authenticated;
+select t.ok('admin sees every session', (select count(*) from athlete_docs) = 1);
+select t.ok('admin can delete a session', t.rows('delete from athlete_docs where id = ''s-1''') = 1);
+reset role;
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');
+select t.err('anon cannot read sessions', 'select count(*) from athlete_docs');
 reset role;

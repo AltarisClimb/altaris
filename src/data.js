@@ -10,6 +10,16 @@ import { toast } from "./ui/feedback.js";
 const COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "config", "audit"];
 const LS_KEY = "altaris.cache.v1";
 const LS_Q   = "altaris.queue.v1";
+/* Collections stockées dans Supabase (table athlete_docs) quand le projet est
+   configuré. Les autres restent sur l'appareil pour l'instant. */
+const REMOTE_COLS = ["sessions"];
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Ligne athlete_docs → document de l'application. */
+function fromDocRow(r){ return Object.assign({}, r.data, { id: r.id, userId: r.athlete_id }); }
+/** Réseau coupé (à réessayer) plutôt que refus du serveur (définitif). */
+function isNetworkError(e){
+  return !e || e instanceof TypeError || !e.code || /fetch|network/i.test(e.message || "");
+}
 
 const Store = {
   db: null,
@@ -100,6 +110,7 @@ const Store = {
     this.data[col][id] = doc;
     this.saveLocal();
     if (!this.silent) requestRender();
+    if (Remote.client && REMOTE_COLS.includes(col)) return this._putRemote(col, id, doc);
     if (this.mode !== "cloud" || !this.db){ this._enqueue({ op:"set", col, id, doc }); return true; }
     try{
       const body = Object.assign({}, doc); delete body.id;
@@ -118,9 +129,85 @@ const Store = {
     if (this.data[col]) delete this.data[col][id];
     this.saveLocal();
     requestRender();
+    if (Remote.client && REMOTE_COLS.includes(col)){
+      try{ await Remote.delDoc(col, id); }
+      catch(e){ if (isNetworkError(e)) this._enqueue({ op:"del", col, id, remote:true }); else toast(t("er.saveFailed"), "crit"); }
+      return;
+    }
     if (this.mode !== "cloud" || !this.db){ this._enqueue({ op:"del", col, id }); return; }
     try{ await this.db.doc(col + "/" + id).delete(); }
     catch(e){ this._enqueue({ op:"del", col, id }); }
+  },
+
+  /* ---------- collections synchronisées avec Supabase (REMOTE_COLS) ----------
+     Écriture optimiste : la copie locale d'abord, puis le serveur. Hors ligne,
+     l'écriture attend dans la file ; refusée par la RLS, elle est signalée et
+     disparaîtra à la prochaine synchronisation. */
+  async _putRemote(col, id, doc){
+    const body = Object.assign({}, doc); delete body.id;
+    try{ await Remote.putDoc(col, id, doc.userId, body); return true; }
+    catch(e){
+      if (isNetworkError(e)){ this._enqueue({ op:"set", col, id, doc, remote:true }); toast(t("er.offline")); return true; }
+      toast(t("er.saveFailed"), "crit"); return false;
+    }
+  },
+
+  async flushRemote(){
+    const pending = this.queue.filter(q => q.remote);
+    if (this._rflushing || !Remote.client || !pending.length) return;
+    this._rflushing = true;
+    for (const item of pending){
+      try{
+        if (item.op === "del") await Remote.delDoc(item.col, item.id);
+        else { const b = Object.assign({}, item.doc); delete b.id; await Remote.putDoc(item.col, item.id, item.doc.userId, b); }
+      }catch(e){ if (isNetworkError(e)) break; /* refusée : on l'abandonne */ }
+      this.queue = this.queue.filter(q => q !== item);
+    }
+    this.saveLocal();
+    this._rflushing = false;
+    if (!this.queue.some(q => q.remote)){ toast(t("er.synced"), "good"); requestRender(); }
+  },
+
+  /** Remplace les collections synchronisées par ce que la RLS laisse voir.
+   *  Les documents créés sur cet appareil avant la synchronisation sont
+   *  envoyés une fois (s'ils concernent un grimpeur visible). */
+  async syncRemote(){
+    if (!Remote.client || !Session.user) return;
+    await this.flushRemote();
+    for (const col of REMOTE_COLS){
+      let rows;
+      try{ rows = await Remote.docs(col); }catch(e){ continue; }             // hors ligne : on garde le cache
+      const next = {};
+      rows.forEach(r => { next[r.id] = fromDocRow(r); });
+      const flag = "altaris.adopted." + col + "." + Session.user.id;
+      let adopted = false;
+      try{ adopted = !!localStorage.getItem(flag); }catch(e){}
+      if (!adopted){
+        for (const d of Object.values(this.data[col] || {})){
+          if (next[d.id] || !UUID.test(d.userId || "") || !Access.canSee(d.userId)) continue;
+          if (await this._putRemote(col, d.id, d)) next[d.id] = d;
+        }
+        try{ localStorage.setItem(flag, "1"); }catch(e){}
+      }
+      this.queue.filter(q => q.remote && q.col === col)
+        .forEach(q => { if (q.op === "del") delete next[q.id]; else next[q.id] = q.doc; });
+      this.data[col] = next;
+    }
+    this.saveLocal();
+    requestRender();
+  },
+
+  /** Synchronisation + changements en direct. Appelé après chaque connexion. */
+  startRemote(){
+    if (!Remote.client) return;
+    this.syncRemote();
+    Remote.watchDocs((col, id, row) => {
+      if (!REMOTE_COLS.includes(col)) return;
+      this.data[col] = this.data[col] || {};
+      if (row) this.data[col][id] = fromDocRow(row); else delete this.data[col][id];
+      this.saveLocal();
+      if (!this.silent) requestRender();
+    });
   },
 
   _enqueue(item){
@@ -148,9 +235,14 @@ const Store = {
 /* .unref() empêche ce minuteur de maintenir le processus Node en vie
    quand la couche de données est importée par la suite de tests.
    Les navigateurs n'exposent pas unref(), d'où la garde. */
-const _flushTimer = setInterval(() => Store.flush(), 12000);
+const _flushTimer = setInterval(() => { Store.flush(); Store.flushRemote(); }, 12000);
 if (_flushTimer && typeof _flushTimer.unref === "function") _flushTimer.unref();
-if (typeof window !== "undefined") window.addEventListener("online", () => Store.flush());
+if (typeof window !== "undefined"){
+  window.addEventListener("online", () => { Store.flush(); Store.syncRemote(); });
+  /* Filet si le temps réel est coupé : on resynchronise au retour sur l'onglet. */
+  let _lastSync = 0;
+  window.addEventListener("focus", () => { if (Date.now() - _lastSync > 30000){ _lastSync = Date.now(); Store.syncRemote(); } });
+}
 
 /* ---------------- audit log (one document per month) ---------------- */
 async function audit(action, detail){
@@ -256,4 +348,4 @@ const Access = {
   }
 };
 
-export { Access, COLS, DEFAULT_CONFIG, LS_KEY, LS_Q, Session, Store, audit, config, touch };
+export { Access, COLS, DEFAULT_CONFIG, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, isNetworkError, touch };
