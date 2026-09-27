@@ -6,7 +6,7 @@
    qui reste à valider et le dernier mot du coach. Les chiffres techniques sont
    dans l'onglet Progrès. */
 import { diffDays, esc, today } from "../core.js";
-import { Access, planOf } from "../data.js";
+import { Access, can, planOf } from "../data.js";
 import { trialDaysLeft } from "../domain/plans.js";
 import { sessionStart } from "../domain/calendar.js";
 import { exById } from "../domain/exercises.js";
@@ -87,7 +87,8 @@ function viewToday(me){
         '<div class="td-hero-main"><span class="eyebrow">' + esc(t("td.today")) + '</span>' +
           '<div class="td-title">' + esc(doneToday ? t("td.doneTitle") : t("td.restTitle")) + '</div>' +
           '<p class="muted small">' + esc(doneToday ? t("td.doneD") : coach ? t("td.restD") : t("td.noCoachD")) + '</p></div>' +
-        (coach ? '<div class="td-cta"><button class="btn" data-act="tab" data-v="messages">' + ic("chat") + esc(t("td.askCoach")) + '</button></div>' : '') +
+        '<div class="td-cta">' + (can(me, "train") && !doneToday ? '<button class="btn pri" data-act="program">' + ic("list") + esc(t("prg.create")) + '</button>' : '') +
+          (coach && can(me, "messaging") ? '<button class="btn" data-act="tab" data-v="messages">' + ic("chat") + esc(t("td.askCoach")) + '</button>' : '') + '</div>' +
       '</div>';
 
   return '<div class="stack lg td">' +

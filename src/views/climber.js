@@ -280,6 +280,7 @@ function agenda(u){
       '<h2>' + esc(t("cal.mySessions")) + '</h2></div>' +
       /* En ligne : abonnement (mise à jour automatique) en premier, le fichier en secours. */
       '<div class="row tight noprint">' +
+        '<button class="btn sm" data-act="program">' + ic("list") + esc(t("prg.mine")) + '</button>' +
         (Remote.client ? '<button class="btn sm pri" data-act="cal-subscribe">' + ic("cal") + esc(t("cal.subscribe")) + '</button>' : '') +
         '<button class="btn sm' + (Remote.client ? ' ghost' : ' pri') + '" data-act="cal-export" data-v="' + esc(u.id) + '"' + (upcoming ? '' : ' disabled') + '>' +
           (Remote.client ? ic("dl") + esc(t("cal.download")) : ic("cal") + esc(t("cal.addToAgenda"))) + '</button></div></div>' +

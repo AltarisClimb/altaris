@@ -1,10 +1,12 @@
-import { $, $$, COPYRIGHT, esc, today, uid } from "./core.js";
+import { $, $$, COPYRIGHT, addDays, esc, today, uid } from "./core.js";
 import { Access, Session, Store, audit, can, hasHealthConsent, planOf } from "./data.js";
 import { FEATURES } from "./domain/plans.js";
 import { Remote } from "./remote.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
-import { FONT, SPORT, fontLabel } from "./domain/grades.js";
+import { FONT, SPORT, fontLabel, trackFor } from "./domain/grades.js";
+import { generateProgram } from "./domain/program.js";
+import { limiters } from "./domain/scoring.js";
 import { sessionLoad } from "./domain/workload.js";
 import { LANG, LI, fmtDateLong, fmtNum, t } from "./i18n/index.js";
 import { body, render } from "./main.js";
@@ -452,6 +454,62 @@ function videoCheckModal(){
   });
 }
 
+/* ---------------- programme automatique ----------------
+   D'après les disponibilités, le niveau et le point faible du dernier bilan.
+   Renouveler remplace les séances à venir de l'ancien programme ; celles
+   planifiées par le coach et celles déjà faites ne bougent pas. */
+function programModal(){
+  const me = Session.live(); if (!me) return;
+  const p = me.profile || {};
+  const weeks = FEATURES[planOf(me)].programWeeks;
+  if (!weeks) return plansModal(t("pl.whyTrain"));
+  const lim = limiters(me.id), weak = lim ? [lim.weak[0]] : [];
+  const from = addDays(today(), 1);
+  const mine = Store.list("sessions").filter(s => s.userId === me.id);
+  const oldProgram = mine.filter(s => s.program && s.status === "planned" && s.date >= from);
+  const taken = mine.filter(s => !s.program && s.date >= from).map(s => s.date);
+  const programId = uid("pg");
+  const list = generateProgram({
+    userId: me.id, profile: p, track: trackFor(p), exercises: EXERCISES, weak, weeks, from, taken, programId,
+    until: planOf(me) === "trial" && me.trialEndsAt ? new Date(me.trialEndsAt).toISOString().slice(0, 10) : null,
+    label: (theme, w) => t("prg." + theme) + (weeks > 1 ? " · " + t("prg.week", { n: w }) : "")
+  });
+  const week1 = list.filter(s => s.program.week === 1);
+  Modal.open({
+    title: oldProgram.length ? t("prg.renew") : t("prg.create"), wide: true,
+    body: '<div class="stack">' +
+      '<p style="line-height:1.6">' + esc(t("prg.intro", { weeks, n: week1.length })) +
+        (weak.length ? ' ' + esc(t("prg.focus", { q: t("d." + weak[0]) })) : '') + '</p>' +
+      (oldProgram.length ? '<div class="notice warn">' + ic("info") + '<span>' + esc(t("prg.replaces", { n: oldProgram.length })) + '</span></div>' : '') +
+      (list.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("prg.week", { n: 1 })) + '</span>' +
+        '<div class="panel in-list">' + week1.map(s =>
+          '<div class="in-row"><span class="in-ic">' + ic("cal") + '</span><span class="in-main">' +
+            '<span class="in-who">' + esc(s.title) + '</span>' +
+            '<span class="in-what">' + esc(fmtDateLong(s.date)) + ' · ' + esc(s.time) + ' · ' + s.plannedMin + ' ' + esc(t("g.min")) + '</span>' +
+            '<span class="in-what">' + esc(s.exercises.map(id => { const e = exById(id); return e ? exName(e) : ""; }).filter(Boolean).join(" · ")) + '</span>' +
+          '</span></div>').join("") + '</div></div>'
+        : '<p class="small muted">' + esc(t("prg.nothing")) + '</p>') +
+      '<p class="dim tiny">' + esc(t("prg.coachNote")) + '</p>' +
+    '</div>',
+    footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button>' +
+      (list.length ? '<button class="btn pri" id="prg-ok">' + ic("check") + esc(oldProgram.length ? t("prg.renew") : t("prg.create")) + '</button>' : ''),
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      const ok = $("#prg-ok", root);
+      if (ok) ok.onclick = async () => {
+        ok.disabled = true;
+        for (const s of oldProgram) await Store.del("sessions", s.id);
+        let saved = 0;
+        for (const s of list) if (await Store.put("sessions", s.id, s)) saved++;
+        audit("program_created", programId + " " + saved + " sessions");
+        Modal.close();
+        toast(t("prg.done", { n: saved }), "good");
+        render();
+      };
+    }
+  });
+}
+
 /* ---------------- formules : comparaison et demande ----------------
    reason (optionnel) : pourquoi on l'affiche (« la messagerie est réservée au Premium »…). */
 const PLAN_ROWS = [["pl.fTests", "fullTests"], ["pl.fProgram", "programWeeks"], ["pl.fLibrary", "train"],
@@ -643,4 +701,4 @@ function withHealthConsent(action){
   healthConsentModal(() => action());
 }
 
-export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };
+export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, programModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

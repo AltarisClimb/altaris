@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, programModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
@@ -55,6 +55,7 @@ const ACTIONS = {
   /* --- séance guidée (src/views/player.js) --- */
   "play-start": (v) => withPlan("train", "pl.whyTrain", () => { startPlayer(v); window.scrollTo(0,0); render(); }),
   plans: () => plansModal(),
+  program: () => programModal(),
   "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
   "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
   "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },

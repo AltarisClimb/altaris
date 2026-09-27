@@ -10,7 +10,7 @@
    PRECACHE lists every module. It is generated from the source tree —
    if you add a file under src/, add it here too or it will be missing
    offline. Bump VERSION on every release so clients refresh the cache. */
-const VERSION = "altaris-v1.15.0";
+const VERSION = "altaris-v1.16.0";
 const SHELL = VERSION + "-shell";
 const FONTS = VERSION + "-fonts";
 const PRECACHE = [
@@ -29,6 +29,7 @@ const PRECACHE = [
   "./src/domain/exercises.js",
   "./src/domain/grades.js",
   "./src/domain/plans.js",
+  "./src/domain/program.js",
   "./src/domain/progress.js",
   "./src/domain/scoring.js",
   "./src/domain/workload.js",
