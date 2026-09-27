@@ -193,6 +193,7 @@ function planningGrid(user){
   const head = '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
       '<h2>' + esc(asCoach ? u.name : t("nav.calendar")) + '</h2></div>' +
       '<div class="row tight noprint">' +
+        (asCoach && Remote.client ? '<button class="btn sm" data-act="call-slots">' + ic("video") + esc(t("vc.slots")) + '</button>' : '') +
         (asCoach ? '<button class="btn sm pri" data-act="block-new" data-v="' + esc(u.id) + '"' + (mode === "day" ? ' data-d="' + calDate() + '"' : '') + '>' +
           ic("plus") + esc(t("cal.addBlock")) + '</button>' : '') +
       '</div></div>' + calToolbar();

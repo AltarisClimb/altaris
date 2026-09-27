@@ -329,6 +329,12 @@ const Remote = {
     const { error } = await this.client.from("call_slots").delete().eq("id", id);
     if (error) throw error;
   },
+  /** Retirer plusieurs créneaux libres d'un coup (les réservés ne sont jamais touchés). */
+  async deleteFreeSlots(ids){
+    if (!ids.length) return;
+    const { error } = await this.client.from("call_slots").delete().in("id", ids).is("booked_by", null);
+    if (error) throw error;
+  },
   /** Réserver : seulement si le créneau est encore libre (deux grimpeurs ne peuvent pas le prendre). */
   async bookSlot(id){
     const me = await this.userId();

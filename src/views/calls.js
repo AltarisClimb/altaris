@@ -7,7 +7,7 @@
 import { $, $$, esc } from "../core.js";
 import { Access, Session, Store, audit, can } from "../data.js";
 import { buildEventICS } from "../domain/calendar.js";
-import { callUsedThisMonth, cancellable, joinable } from "../domain/plans.js";
+import { callUsedThisMonth, cancellable, expandWeekly, joinable, slotsToRemove } from "../domain/plans.js";
 import { downloadFile } from "../export.js";
 import { LOC, t } from "../i18n/index.js";
 import { render } from "../main.js";
@@ -97,48 +97,129 @@ function callIcs(id){
     "text/calendar;charset=utf-8");
 }
 
-/* ---------- côté coach : ses créneaux ---------- */
+/* ---------- côté coach : grille de disponibilités (clic = ouvrir / retirer) ----------
+   Cases de 30 min, 7 h – 22 h, une semaine à la fois. Un clic ouvre une case vide
+   ou retire un créneau libre ; à la souris, glisser applique le même geste à
+   plusieurs cases. « Chaque semaine » répète l'ajout sur 8 semaines et retire
+   toute la série à venir. Les créneaux réservés ne se retirent pas par erreur. */
+const GRID_FROM = 7, GRID_TO = 22, REPEAT_WEEKS = 8;
+const grid = { week: null, repeat: false };
+
+function mondayOf(ms){
+  const d = new Date(ms); d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.getTime();
+}
+
+function gridHtml(me){
+  const w0 = grid.week, now = Date.now();
+  const mine = new Map(Remote.calls.filter(c => c.coach_id === me.id).map(c => [c.start, c]));
+  const days = [0, 1, 2, 3, 4, 5, 6].map(i => { const d = new Date(w0); d.setDate(d.getDate() + i); return d; });
+  let rows = "";
+  for (let h = GRID_FROM; h < GRID_TO; h++) for (const m of [0, 30]){
+    rows += '<span class="vg-h">' + (m ? '' : String(h).padStart(2, "0") + ":00") + '</span>';
+    for (const d of days){
+      const at = new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
+      const slot = mine.get(at);
+      const who = slot && slot.booked_by ? Store.get("users", slot.booked_by) : null;
+      const past = at <= now;
+      rows += '<button class="vg-c' + (slot ? (slot.booked_by ? ' booked' : ' open') : '') + (past ? ' past' : '') + '" data-ms="' + at + '"' +
+        (past && !(slot && slot.booked_by) ? ' disabled' : '') +
+        ' aria-label="' + esc(when(at) + " · " + (slot ? (slot.booked_by ? t("vc.bookedBy", { name: who ? who.name : "—" }) : t("vc.free")) : t("vc.closed"))) + '">' +
+        (who ? esc(who.name.split(" ").map(x => x[0]).join("").slice(0, 2)) : '') + '</button>';
+    }
+  }
+  const booked = Remote.calls.filter(c => c.coach_id === me.id && c.booked_by && c.start + c.minutes * 60000 > now);
+  return '<div class="stack">' +
+    '<p class="small muted">' + esc(t("vc.gridD")) + '</p>' +
+    '<div class="between">' +
+      '<div class="row tight"><button class="btn icon sm ghost" data-g="-1" aria-label="' + esc(t("g.previous")) + '">' + ic("chevL") + '</button>' +
+        '<button class="btn sm ghost" data-g="0">' + esc(t("g.today")) + '</button>' +
+        '<button class="btn icon sm ghost" data-g="1" aria-label="' + esc(t("g.next")) + '">' + ic("chevR") + '</button>' +
+        '<span class="cal-title">' + esc(days[0].toLocaleDateString(LOC(), { day: "numeric", month: "short" }) + " – " +
+          days[6].toLocaleDateString(LOC(), { day: "numeric", month: "short", year: "numeric" })) + '</span></div>' +
+      '<label class="vg-rep"><input type="checkbox" id="vg-repeat"' + (grid.repeat ? ' checked' : '') + '> ' + esc(t("vc.repeatW", { n: REPEAT_WEEKS })) + '</label>' +
+    '</div>' +
+    '<div class="vg" id="vg">' +
+      '<span></span>' + days.map(d => '<span class="vg-dh' + (d.toDateString() === new Date().toDateString() ? ' today' : '') + '">' +
+        esc(d.toLocaleDateString(LOC(), { weekday: "short" })) + '<b>' + d.getDate() + '</b></span>').join("") +
+      rows +
+    '</div>' +
+    '<div class="row tight small muted"><span class="vg-key open"></span>' + esc(t("vc.free")) +
+      '<span class="vg-key booked"></span>' + esc(t("vc.bookedKey")) + '</div>' +
+    (booked.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("vc.upcoming")) + '</span><div class="panel in-list">' + booked.map(c => {
+      const who = Store.get("users", c.booked_by);
+      return '<div class="in-row msg"><span class="in-ic">' + ic("video") + '</span><span class="in-main"><span class="in-who">' + esc(when(c.start)) + '</span>' +
+        '<span class="in-what">' + esc(t("vc.bookedBy", { name: who ? who.name : "—" })) + '</span></span>' +
+        '<a class="btn sm pri" href="' + esc(Remote.jitsiUrl(c.room)) + '" target="_blank" rel="noopener noreferrer">' + esc(t("vc.join")) + '</a></div>';
+    }).join("") + '</div></div>' : '') +
+  '</div>';
+}
+
 function coachCallsModal(){
   const me = Session.live(); if (!me) return;
-  const mine = Remote.calls.filter(c => c.coach_id === me.id && c.start + c.minutes * 60000 > Date.now());
-  const d0 = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  if (!grid.week) grid.week = mondayOf(Date.now());
   Modal.open({
     title: t("vc.slots"), wide: true,
-    body: '<div class="stack">' +
-      '<p class="small muted">' + esc(t("vc.slotsD")) + '</p>' +
-      '<div class="grid g2">' +
-        '<label class="f"><span class="lb">' + esc(t("g.date")) + '</span><input class="inp num" type="date" id="vc-date" value="' + d0 + '" min="' + new Date().toISOString().slice(0, 10) + '"></label>' +
-        '<label class="f"><span class="lb">' + esc(t("cal.time")) + '</span><input class="inp num" type="time" id="vc-time" value="18:00" step="900"></label>' +
-      '</div>' +
-      '<label class="check"><input type="checkbox" id="vc-repeat"><span class="t">' + esc(t("vc.repeat")) + '</span></label>' +
-      '<div><button class="btn sm pri" id="vc-add">' + ic("plus") + esc(t("vc.add")) + '</button></div>' +
-      '<div class="panel in-list">' + (mine.length ? mine.map(c => {
-        const who = c.booked_by ? Store.get("users", c.booked_by) : null;
-        return '<div class="in-row' + (c.booked_by ? ' msg' : '') + '"><span class="in-ic">' + ic(c.booked_by ? "video" : "cal") + '</span>' +
-          '<span class="in-main"><span class="in-who">' + esc(when(c.start)) + '</span>' +
-          '<span class="in-what">' + esc(c.booked_by ? t("vc.bookedBy", { name: who ? who.name : "—" }) : t("vc.free")) + '</span></span>' +
-          (c.booked_by ? '<a class="btn sm pri" href="' + esc(Remote.jitsiUrl(c.room)) + '" target="_blank" rel="noopener noreferrer">' + esc(t("vc.join")) + '</a>'
-                       : '<button class="btn sm ghost" data-del="' + esc(c.id) + '" aria-label="' + esc(t("g.delete")) + '">' + ic("trash") + '</button>') +
-        '</div>'; }).join("") : '<div class="in-row"><span class="in-main"><span class="in-what">' + esc(t("vc.noneYet")) + '</span></span></div>') + '</div>' +
-    '</div>',
+    body: '<div id="vg-root">' + gridHtml(me) + '</div>',
     footer: '<button class="btn" data-c>' + esc(t("g.close")) + '</button>',
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
-      $("#vc-add", root).onclick = async () => {
-        const [y, m, d] = $("#vc-date", root).value.split("-").map(Number), [hh, mm] = $("#vc-time", root).value.split(":").map(Number);
-        if (!y || isNaN(hh)) return toast(t("er.required"), "crit");
-        const first = new Date(y, m - 1, d, hh, mm).getTime();
-        if (first <= Date.now()) return toast(t("vc.past"), "crit");
-        const starts = $("#vc-repeat", root).checked ? [0, 1, 2, 3].map(w => first + w * 7 * 86400000) : [first];
-        try{ await Remote.addSlots(me.id, starts); await Remote.loadCalls(); }
-        catch(e){ return toast(t("er.saveFailed"), "crit"); }
-        toast(t("vc.added", { n: starts.length }), "good"); coachCallsModal();
+      const host = $("#vg-root", root);
+      const redraw = () => { host.innerHTML = gridHtml(me); };
+      let busy = false;
+
+      /* Appliquer un geste : ouvrir ou retirer les cases choisies (et leur série si « chaque semaine »). */
+      const commit = async (mode, starts) => {
+        if (!starts.length || busy) return;
+        busy = true;
+        try{
+          if (mode === "add") await Remote.addSlots(me.id, expandWeekly(starts, grid.repeat ? REPEAT_WEEKS : 1));
+          else await Remote.deleteFreeSlots(slotsToRemove(Remote.calls.filter(c => c.coach_id === me.id), starts, grid.repeat).map(c => c.id));
+          await Remote.loadCalls();
+        }catch(e){ toast(t("er.saveFailed"), "crit"); }
+        busy = false;
+        redraw();
       };
-      $$("[data-del]", root).forEach(b => b.onclick = async () => {
-        try{ await Remote.deleteSlot(b.dataset.del); await Remote.loadCalls(); }
-        catch(e){ return toast(t("er.saveFailed"), "crit"); }
-        coachCallsModal();
+
+      /* Souris / stylet : glisser pour peindre. Toucher : un tap = une case (la grille défile). */
+      let drag = null, justPainted = false;
+      const cellAt = (x, y) => { const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest(".vg-c") : null; };
+      const eligible = (el, mode) => el && !el.disabled && !el.classList.contains("booked") &&
+        (mode === "add" ? !el.classList.contains("open") : el.classList.contains("open"));
+      host.addEventListener("pointerdown", (e) => {
+        const el = e.target.closest(".vg-c");
+        if (!el || e.pointerType === "touch" || el.disabled || el.classList.contains("booked")) return;
+        e.preventDefault();
+        drag = { mode: el.classList.contains("open") ? "remove" : "add", set: new Set([Number(el.dataset.ms)]) };
+        el.classList.add(drag.mode === "add" ? "pend-add" : "pend-del");
       });
+      host.addEventListener("pointermove", (e) => {
+        if (!drag) return;
+        const el = cellAt(e.clientX, e.clientY);
+        if (eligible(el, drag.mode) && !drag.set.has(Number(el.dataset.ms))){
+          drag.set.add(Number(el.dataset.ms));
+          el.classList.add(drag.mode === "add" ? "pend-add" : "pend-del");
+        }
+      });
+      const end = () => { if (!drag) return; const d = drag; drag = null; justPainted = true; setTimeout(() => { justPainted = false; }, 0); commit(d.mode, [...d.set]); };
+      host.addEventListener("pointerup", end);
+      host.addEventListener("pointerleave", end);
+      host.addEventListener("click", (e) => {
+        const nav = e.target.closest("[data-g]");
+        if (nav){ const n = Number(nav.dataset.g); grid.week = n ? grid.week + n * 7 * 86400000 : mondayOf(Date.now());
+                  grid.week = mondayOf(grid.week + 12 * 3600000); redraw(); return; }
+        const el = e.target.closest(".vg-c");
+        if (!el || justPainted) return;
+        if (el.classList.contains("booked")){                       // réservé : ouvrir la visio
+          const c = Remote.calls.find(x => x.start === Number(el.dataset.ms) && x.coach_id === me.id);
+          if (c) window.open(Remote.jitsiUrl(c.room), "_blank", "noopener");
+          return;
+        }
+        if (el.disabled) return;
+        commit(el.classList.contains("open") ? "remove" : "add", [Number(el.dataset.ms)]);
+      });
+      host.addEventListener("change", (e) => { if (e.target.id === "vg-repeat") grid.repeat = e.target.checked; });
     }
   });
 }

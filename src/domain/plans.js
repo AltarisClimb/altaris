@@ -49,3 +49,23 @@ function joinable(slot, now){
 function cancellable(slot, now){ return slot.start - (now || Date.now()) > 24 * 3600000; }
 
 export { FEATURES, PLANS, allows, callUsedThisMonth, cancellable, effectivePlan, joinable, trialDaysLeft };
+
+/* ---------- disponibilités visio du coach (grille à cliquer) ---------- */
+const WEEK = 7 * 86400000;
+/** Répéter chaque semaine : les mêmes créneaux sur `weeks` semaines (1 = pas de répétition), futurs uniquement. */
+function expandWeekly(starts, weeks, now){
+  const out = new Set();
+  for (const s of starts) for (let k = 0; k < (weeks || 1); k++){
+    /* Même heure locale d'une semaine à l'autre, même au changement d'heure. */
+    const d = new Date(s); d.setDate(d.getDate() + 7 * k);
+    if (d.getTime() > (now || Date.now())) out.add(d.getTime());
+  }
+  return [...out].sort((a, b) => a - b);
+}
+const sameWeekSlot = (a, b) => { const x = new Date(a), y = new Date(b);
+  return x.getDay() === y.getDay() && x.getHours() === y.getHours() && x.getMinutes() === y.getMinutes(); };
+/** Créneaux libres à retirer : ceux cliqués, ou toute la série à venir (même jour de semaine, même heure). */
+function slotsToRemove(slots, starts, series){
+  return slots.filter(c => !c.booked_by && starts.some(s => series ? c.start >= s && sameWeekSlot(c.start, s) : c.start === s));
+}
+export { WEEK, expandWeekly, slotsToRemove };

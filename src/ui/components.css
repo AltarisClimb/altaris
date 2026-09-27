@@ -688,3 +688,23 @@ main > *{animation:fade-up .22s ease both}
 .yr-d.has.done{background:var(--type); color:var(--bg)}
 .yr-d.today{box-shadow:inset 0 0 0 2px var(--accent)}
 .yr-d:hover{background:var(--surface-3)}
+
+/* ---------- grille de disponibilités visio (coach) ---------- */
+.vg{display:grid; grid-template-columns:48px repeat(7, minmax(0, 1fr)); gap:2px; max-height:58vh; overflow-y:auto;
+  user-select:none; -webkit-user-select:none; touch-action:pan-y; padding-right:2px}
+.vg-dh{position:sticky; top:0; z-index:1; background:var(--surface); display:flex; flex-direction:column; align-items:center;
+  font:600 10px/1.2 var(--sans); text-transform:uppercase; letter-spacing:.06em; color:var(--ink-3); padding:4px 0}
+.vg-dh b{font:600 15px/1.2 var(--sans); color:var(--ink); letter-spacing:0}
+.vg-dh.today b{color:var(--accent)}
+.vg-h{font:500 10px/1 var(--mono); color:var(--ink-3); text-align:right; padding-right:6px; transform:translateY(-5px)}
+.vg-c{height:24px; border-radius:4px; background:var(--surface-2); border:1px solid transparent; font:700 9px/1 var(--sans);
+  color:var(--accent-ink); cursor:pointer; transition:background .08s}
+.vg-c:hover:not(:disabled){border-color:var(--accent-line)}
+.vg-c.open{background:var(--accent)}
+.vg-c.booked{background:var(--good); color:var(--bg)}
+.vg-c.past{opacity:.35; cursor:default}
+.vg-c.pend-add{background:var(--accent-line)}
+.vg-c.pend-del{background:var(--crit-wash); border-color:var(--crit)}
+.vg-rep{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; cursor:pointer}
+.vg-key{display:inline-block; width:12px; height:12px; border-radius:3px; margin:0 4px 0 10px; vertical-align:middle}
+.vg-key.open{background:var(--accent)} .vg-key.booked{background:var(--good)}

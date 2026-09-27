@@ -56,3 +56,19 @@ test("visio dans l'agenda : heure UTC exacte, lien, rappel", () => {
   assert.ok(ics.includes("URL:https://meet.jit.si/ALTARIS-x"));
   assert.ok(ics.includes("TRIGGER:-PT1H"));
 });
+
+import { expandWeekly, slotsToRemove } from "../src/domain/plans.js";
+
+test("disponibilités : répétition hebdomadaire et retrait d'une série", () => {
+  const s = new Date(2026, 9, 5, 18, 0).getTime();                    // lundi 5 octobre 18:00 (heure locale)
+  const now = new Date(2026, 9, 1).getTime();
+  const weeks = expandWeekly([s], 8, now);
+  assert.equal(weeks.length, 8);
+  assert.ok(weeks.every(ms => new Date(ms).getDay() === 1 && new Date(ms).getHours() === 18));
+  assert.deepEqual(expandWeekly([s], 1, now), [s]);
+  assert.deepEqual(expandWeekly([now - 1000], 1, now), [], "rien dans le passé");
+  const slots = weeks.map((ms, i) => ({ id: "c" + i, start: ms, booked_by: i === 2 ? "u1" : null }))
+    .concat([{ id: "other", start: new Date(2026, 9, 6, 18, 0).getTime(), booked_by: null }]);
+  assert.deepEqual(slotsToRemove(slots, [s], false).map(c => c.id), ["c0"]);
+  assert.deepEqual(slotsToRemove(slots, [weeks[1]], true).map(c => c.id), ["c1", "c3", "c4", "c5", "c6", "c7"], "série à venir, sans le réservé ni l'autre jour");
+});
