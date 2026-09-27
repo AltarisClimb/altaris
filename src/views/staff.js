@@ -294,6 +294,12 @@ function inboxItems(me){
     const c = Store.get("users", r.user_id);
     if (c) out.push({ sev: "msg", c, icon: "user", text: t("in.planReq", { plan: t("plan." + r.plan) }), act: "plan-req", v: r.id, btn: t("in.open") });
   }
+  /* Visios réservées aujourd'hui avec ce coach. */
+  const todayStr = new Date().toDateString();
+  for (const call of (Remote.calls || []).filter(x => x.coach_id === me.id && x.booked_by && new Date(x.start).toDateString() === todayStr && x.start + x.minutes * 60000 > Date.now())){
+    const u = Store.get("users", call.booked_by);
+    if (u) out.push({ sev: "msg", c: u, icon: "video", text: t("vc.todayAt", { time: new Date(call.start).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }), act: "call-join", v: call.id, btn: t("vc.join") });
+  }
   for (const c of Access.climbers()){
     const th = getThread(me.id, c.id);
     const lastRead = (th.read || {})[me.id] || 0;

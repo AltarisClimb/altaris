@@ -7,6 +7,7 @@
    dans l'onglet Progrès. */
 import { diffDays, esc, today } from "../core.js";
 import { Access, can, planOf } from "../data.js";
+import { Remote } from "../remote.js";
 import { trialDaysLeft } from "../domain/plans.js";
 import { sessionStart } from "../domain/calendar.js";
 import { exById } from "../domain/exercises.js";
@@ -15,6 +16,7 @@ import { fmtDate, t } from "../i18n/index.js";
 import { ic } from "../ui/icons.js";
 import { exercisePose } from "../ui/poses.js";
 import { sessionsOf } from "./climber.js";
+import { callCard } from "./calls.js";
 import { getThread } from "./library.js";
 
 /** Couleur d'un type de séance (bande des cartes, pastilles). */
@@ -119,6 +121,8 @@ function viewToday(me){
         '<div class="small muted">' + esc(streak ? t("td.streakD") : t("td.streakStart")) + '</div></div></div>' +
     '</div>' +
 
+    /* Visio réservée dans les 7 prochains jours : rappel sur l'accueil. */
+    (Remote.client && Remote.calls.some(c => c.booked_by === me.id && c.start + c.minutes * 60000 > Date.now() && c.start - Date.now() < 7 * 86400000) ? callCard(me) : '') +
     (coachMsg ? '<div class="panel pad stack sm td-msg">' +
       '<span class="eyebrow">' + esc(t("td.fromCoach", { name: coach.name })) + '</span>' +
       '<p class="td-quote">' + esc(coachMsg.text.length > 180 ? coachMsg.text.slice(0, 177) + "…" : coachMsg.text) + '</p>' +

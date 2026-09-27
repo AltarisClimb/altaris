@@ -637,3 +637,7 @@ main > *{animation:fade-up .22s ease both}
 .pk li b{color:var(--ink); white-space:nowrap}
 .btn.link, button.link{background:none; border:0; padding:0; color:var(--accent); font-weight:600; text-decoration:underline; cursor:pointer}
 @media (max-width:640px){ .pk-grid{grid-template-columns:1fr} }
+
+/* ---------- visio (Premium) ---------- */
+.vc-card{border-color:var(--accent-line)}
+.btn.off{opacity:.45; pointer-events:none}

@@ -309,6 +309,40 @@ const Remote = {
     await this.client.from("profiles").update({ timezone: tz, lang }).eq("id", user.id);
   },
 
+  /* ---------- visios (Premium) : créneaux publiés par le coach ---------- */
+  calls: [],
+  /** Créneaux visibles (RLS) depuis hier : les siens pour un coach, ceux de son coach pour un grimpeur. */
+  async loadCalls(){
+    const { data, error } = await this.client.from("call_slots")
+      .select("id, coach_id, starts_at, minutes, booked_by, booked_at, room")
+      .gte("starts_at", new Date(Date.now() - 86400000).toISOString()).order("starts_at");
+    if (error) throw error;
+    this.calls = data.map(r => Object.assign({}, r, { start: Date.parse(r.starts_at) }));
+    return this.calls;
+  },
+  async addSlots(coachId, starts){
+    const rows = starts.map(ms => ({ coach_id: coachId, starts_at: new Date(ms).toISOString() }));
+    const { error } = await this.client.from("call_slots").upsert(rows, { onConflict: "coach_id,starts_at", ignoreDuplicates: true });
+    if (error) throw error;
+  },
+  async deleteSlot(id){
+    const { error } = await this.client.from("call_slots").delete().eq("id", id);
+    if (error) throw error;
+  },
+  /** Réserver : seulement si le créneau est encore libre (deux grimpeurs ne peuvent pas le prendre). */
+  async bookSlot(id){
+    const me = await this.userId();
+    const { data, error } = await this.client.from("call_slots").update({ booked_by: me })
+      .eq("id", id).is("booked_by", null).select("id");
+    if (error) throw error;
+    if (!data.length) throw Object.assign(new Error("slot taken"), { code: "slot_taken" });
+  },
+  async cancelBooking(id){
+    const { error } = await this.client.from("call_slots").update({ booked_by: null }).eq("id", id);
+    if (error) throw error;
+  },
+  jitsiUrl(room){ return "https://meet.jit.si/ALTARIS-" + room; },
+
   /* ---------- formules : demandes de changement ---------- */
   async requestPlan(plan){
     const { error } = await this.client.from("plan_requests").insert({ plan });

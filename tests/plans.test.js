@@ -32,3 +32,27 @@ test("jours d'essai restants", () => {
   assert.equal(trialDaysLeft({ role: "climber", plan: "standard" }, now), null);
   assert.equal(trialDaysLeft({ role: "climber", plan: "trial", trialEndsAt: now - day }, now), null);
 });
+
+import { callUsedThisMonth, cancellable, joinable } from "../src/domain/plans.js";
+import { buildEventICS } from "../src/domain/calendar.js";
+
+test("visio : une par mois, rejoindre 10 min avant, annuler 24 h avant", () => {
+  const me = "u1", start = Date.UTC(2026, 9, 20, 16, 0);
+  const calls = [{ booked_by: me, start, minutes: 30 }];
+  assert.equal(callUsedThisMonth(calls, me, Date.UTC(2026, 9, 2)), true);
+  assert.equal(callUsedThisMonth(calls, me, Date.UTC(2026, 10, 2)), false);
+  assert.equal(callUsedThisMonth(calls, "other", Date.UTC(2026, 9, 2)), false);
+  assert.equal(joinable(calls[0], start - 11 * 60000), false);
+  assert.equal(joinable(calls[0], start - 9 * 60000), true);
+  assert.equal(joinable(calls[0], start + 31 * 60000), false);
+  assert.equal(cancellable(calls[0], start - 25 * 3600000), true);
+  assert.equal(cancellable(calls[0], start - 23 * 3600000), false);
+});
+
+test("visio dans l'agenda : heure UTC exacte, lien, rappel", () => {
+  const ics = buildEventICS({ uid: "call-1", start: Date.UTC(2026, 9, 20, 16, 0), minutes: 30, title: "Visio", url: "https://meet.jit.si/ALTARIS-x" });
+  assert.ok(ics.includes("DTSTART:20261020T160000Z"));
+  assert.ok(ics.includes("DTEND:20261020T163000Z"));
+  assert.ok(ics.includes("URL:https://meet.jit.si/ALTARIS-x"));
+  assert.ok(ics.includes("TRIGGER:-PT1H"));
+});

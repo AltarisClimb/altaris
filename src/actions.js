@@ -12,6 +12,7 @@ import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, dele
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
+import { bookModal, callIcs, cancelCall, coachCallsModal } from "./views/calls.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { sessionsOf } from "./views/climber.js";
@@ -56,6 +57,12 @@ const ACTIONS = {
   "play-start": (v) => withPlan("train", "pl.whyTrain", () => { startPlayer(v); window.scrollTo(0,0); render(); }),
   plans: () => plansModal(),
   program: () => programModal(),
+  /* --- visios Premium (src/views/calls.js) --- */
+  "call-book": () => bookModal(),
+  "call-cancel": (v) => cancelCall(v),
+  "call-ics": (v) => callIcs(v),
+  "call-slots": () => coachCallsModal(),
+  "call-join": (v) => { const c = Remote.calls.find(x => x.id === v); if (c) window.open(Remote.jitsiUrl(c.room), "_blank", "noopener"); },
   "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
   "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
   "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },

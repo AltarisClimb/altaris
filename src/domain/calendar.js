@@ -92,4 +92,17 @@ function buildICS(sessions, opts){
   return lines.map(fold).join("\r\n") + "\r\n";
 }
 
-export { DEFAULT_TIME, buildICS, sessionStart, upcomingForAgenda, weekdayIndex };
+/** Un seul événement (ex. : visio avec le coach) : { uid, start (ms), minutes, title, desc, url }. Rappel 1 h avant. */
+function buildEventICS(ev){
+  const start = new Date(ev.start), end = new Date(ev.start + (ev.minutes || 30) * 60000);
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//ALTARIS//Visio//FR", "METHOD:PUBLISH",
+    "BEGIN:VEVENT", "UID:" + ev.uid + "@altaris-climb.com", "DTSTAMP:" + utcStamp(new Date()),
+    "DTSTART:" + utcStamp(start), "DTEND:" + utcStamp(end),
+    "SUMMARY:" + escapeText(ev.title), "DESCRIPTION:" + escapeText(ev.desc || ""),
+    ...(ev.url ? ["URL:" + ev.url, "LOCATION:" + escapeText(ev.url)] : []),
+    "BEGIN:VALARM", "ACTION:DISPLAY", "TRIGGER:-PT1H", "DESCRIPTION:" + escapeText(ev.title), "END:VALARM",
+    "END:VEVENT", "END:VCALENDAR"];
+  return lines.map(fold).join("\r\n") + "\r\n";
+}
+
+export { DEFAULT_TIME, buildEventICS, buildICS, sessionStart, upcomingForAgenda, weekdayIndex };

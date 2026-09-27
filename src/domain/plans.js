@@ -32,4 +32,20 @@ function trialDaysLeft(u, now){
   return Math.max(0, Math.ceil((u.trialEndsAt - (now || Date.now())) / 86400000));
 }
 
-export { FEATURES, PLANS, allows, effectivePlan, trialDaysLeft };
+
+
+/* ---------- visios (Premium) ---------- */
+/** La visio du mois (calendaire, UTC comme le serveur) est-elle déjà réservée ? */
+function callUsedThisMonth(calls, userId, now){
+  const d = new Date(now || Date.now()), y = d.getUTCFullYear(), m = d.getUTCMonth();
+  return calls.some(c => c.booked_by === userId && new Date(c.start).getUTCFullYear() === y && new Date(c.start).getUTCMonth() === m);
+}
+/** On peut rejoindre 10 min avant le début, et jusqu'à la fin prévue. */
+function joinable(slot, now){
+  const t = now || Date.now();
+  return t >= slot.start - 10 * 60000 && t <= slot.start + (slot.minutes || 30) * 60000;
+}
+/** Annulation par le grimpeur : au moins 24 h avant (règle du serveur). */
+function cancellable(slot, now){ return slot.start - (now || Date.now()) > 24 * 3600000; }
+
+export { FEATURES, PLANS, allows, callUsedThisMonth, cancellable, effectivePlan, joinable, trialDaysLeft };

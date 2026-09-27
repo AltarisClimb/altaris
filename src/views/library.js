@@ -13,6 +13,7 @@ import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { exercisePose, variantPose } from "../ui/poses.js";
 import { painLabel } from "./climber.js";
+import { callCard } from "./calls.js";
 import { View, isStaff, presenceDot, presenceText } from "./shell.js";
 /* ================================================================
    15. EXERCISE BANK
@@ -231,7 +232,11 @@ function viewMessages(me){
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ms.title")) + '</span>' +
       '<h2 class="pr-h">' + presenceDot(other) + esc(other.name) + '</h2><p>' + esc(t("role."+other.role)) +
-        (presenceText(other) ? ' · ' + esc(presenceText(other)) : '') + '</p></div></div>' +
+        (presenceText(other) ? ' · ' + esc(presenceText(other)) : '') + '</p></div>' +
+      /* Coach : ses créneaux de visio (Premium). */
+      (isStaff(me) && Remote.client ? '<button class="btn sm noprint" data-act="call-slots">' + ic("video") + esc(t("vc.slots")) + '</button>' : '') +
+    '</div>' +
+    callCard(me) +
     (partners.length > 1 ? '<div class="row tight noprint">' + partners.map(x => {
       const u = getThread(me.id, x.id);
       const n = (u.messages||[]).filter(m => m.from !== me.id && m.ts > ((u.read||{})[me.id]||0)).length;

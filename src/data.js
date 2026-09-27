@@ -212,6 +212,8 @@ const Store = {
     try{ this.mergeUsers(await Remote.profiles()); }catch(e){ /* hors ligne : cache */ }
     /* Admin : demandes de formule en attente, pour « À traiter ». */
     if (Session.user.role === "admin") try{ Remote.requests = await Remote.planRequests(); }catch(e){}
+    /* Visios : créneaux du coach (encadrant) ou de son coach (grimpeur Premium). */
+    if (can(Session.user, "calls")) try{ await Remote.loadCalls(); }catch(e){}
     for (const col of REMOTE_COLS){
       let rows;
       try{ rows = await Remote.docs(col); }catch(e){ continue; }             // hors ligne : on garde le cache

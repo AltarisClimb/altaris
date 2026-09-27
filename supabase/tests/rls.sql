@@ -287,6 +287,47 @@ select t.ok('admin marks the request handled', t.rows('update plan_requests set 
 reset role;
 select t.ok('upgraded: plan is premium again', public.plan_of('00000000-0000-0000-0000-0000000000e1') = 'premium');
 
+-- ================= video calls (premium)
+-- Coach T1 with two climbers: C1 premium, C2 standard.
+select t.as(null);
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000f1', 'c1@x', '{}'), ('00000000-0000-0000-0000-0000000000f2', 'c2@x', '{}');
+update profiles set plan = 'premium', teacher_id = :T1 where email = 'c1@x';
+update profiles set plan = 'standard', teacher_id = :T1 where email = 'c2@x';
+
+select t.as(:T1); set role authenticated;
+select t.ok('coach publishes slots', t.rows('insert into call_slots (starts_at) values
+  (date_trunc(''month'', now()) + interval ''1 month 3 days 18 hours''),
+  (date_trunc(''month'', now()) + interval ''1 month 10 days 18 hours''),
+  (date_trunc(''month'', now()) + interval ''2 months 3 days 18 hours'')') = 3);
+select t.err('no slot in the past', 'insert into call_slots (starts_at) values (now() - interval ''1 hour'')');
+reset role;
+select t.as('00000000-0000-0000-0000-0000000000f2'); set role authenticated;
+select t.ok('standard climber sees the coach slots', (select count(*) from call_slots) = 3);
+select t.err('standard climber cannot book', 'update call_slots set booked_by = auth.uid() where starts_at = (select min(starts_at) from call_slots)');
+reset role;
+select t.as('00000000-0000-0000-0000-0000000000f1'); set role authenticated;
+select t.ok('premium climber books a slot', t.rows('update call_slots set booked_by = auth.uid() where starts_at = (select min(starts_at) from call_slots)') = 1);
+select t.ok('booking time is stamped', (select booked_at is not null from call_slots where booked_by = auth.uid()));
+select t.err('only one call per month', 'update call_slots set booked_by = auth.uid() where starts_at = (select min(starts_at) from call_slots where booked_by is null)');
+select t.ok('next month is fine', t.rows('update call_slots set booked_by = auth.uid() where starts_at = (select max(starts_at) from call_slots)') = 1);
+select t.err('climber cannot move a slot', 'update call_slots set starts_at = starts_at + interval ''1 day'' where booked_by = auth.uid()');
+select t.ok('climber cancels a booking more than 24 h ahead', t.rows('update call_slots set booked_by = null where starts_at = (select max(starts_at) from call_slots where booked_by = auth.uid())') = 1);
+select t.err('climber cannot publish slots', 'insert into call_slots (starts_at) values (now() + interval ''3 days'')');
+reset role;
+select t.as('00000000-0000-0000-0000-0000000000f2'); set role authenticated;
+select t.ok('others no longer see a booked slot', (select count(*) from call_slots) = 2);
+select t.ok('cannot take a booked slot (invisible, nothing updated)', t.rows('update call_slots set booked_by = auth.uid() where booked_by is not null') = 0);
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('a climber of another coach sees nothing', (select count(*) from call_slots) = 0);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('coach sees the booking', (select count(*) from call_slots where booked_by is not null) = 1);
+select t.ok('coach can remove a slot', t.rows('delete from call_slots where booked_by is null and starts_at = (select max(starts_at) from call_slots)') = 1);
+reset role;
+select t.as(null);
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');
