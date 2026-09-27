@@ -708,3 +708,16 @@ main > *{animation:fade-up .22s ease both}
 .vg-rep{display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; cursor:pointer}
 .vg-key{display:inline-block; width:12px; height:12px; border-radius:3px; margin:0 4px 0 10px; vertical-align:middle}
 .vg-key.open{background:var(--accent)} .vg-key.booked{background:var(--good)}
+
+/* ---------- minuteur de visio (coach) ---------- */
+.ct{position:fixed; right:16px; bottom:86px; z-index:90; width:250px; padding:12px 14px; border-radius:var(--r-lg);
+  background:var(--surface); border:1px solid var(--accent-line); box-shadow:var(--shadow); display:flex; flex-direction:column; gap:8px}
+.ct-top{display:flex; align-items:center; justify-content:space-between; gap:6px}
+.ct-who{display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ct-who svg{width:15px; height:15px; color:var(--accent); flex:none}
+.ct-time{font:700 24px/1 var(--mono)}
+.ct-bar{height:5px; border-radius:3px; background:var(--surface-3); overflow:hidden}
+.ct-bar span{display:block; height:100%; background:var(--accent); transition:width 1s linear}
+.ct.warn{border-color:var(--warn)} .ct.warn .ct-time{color:var(--warn)} .ct.warn .ct-bar span{background:var(--warn)}
+.ct.over{border-color:var(--line)} .ct.over .ct-time{color:var(--ink-3); font-size:18px}
+@media (max-width:640px){ .ct{left:16px; right:16px; width:auto} }

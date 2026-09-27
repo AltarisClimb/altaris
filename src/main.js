@@ -13,6 +13,7 @@ import { HIDDEN_TABS, TABS, View, legalFooter, tabsBar, topbar, watermark } from
 import { viewAdmin, viewAthleteFile, viewFleet, viewInbox, viewPlanning } from "./views/staff.js";
 import { bindTimer, updateLiveMetric, viewTests } from "./views/testing.js";
 import { bindPlayer, viewPlayer } from "./views/player.js";
+import { bindCallTimer, timerWidget } from "./views/calls.js";
 import { viewToday } from "./views/today.js";
 /* Import à effet de bord : actions.js n'exporte rien que main utilise,
    mais il enregistre tous les écouteurs d'événements de l'application.
@@ -63,7 +64,7 @@ function render(){
   const fk = act && act.dataset ? act.dataset.fk : null;
   const selStart = act && typeof act.selectionStart === "number" ? act.selectionStart : null;
   const sy = window.scrollY;
-  app.innerHTML = watermark() + topbar() + body() + legalFooter();
+  app.innerHTML = watermark() + topbar() + body() + timerWidget() + legalFooter();
   if (fk){
     const el = $('[data-fk="' + fk + '"]');
     if (el){ el.focus(); if (selStart != null){ try{ el.setSelectionRange(selStart, selStart); }catch(e){} } }
@@ -71,6 +72,7 @@ function render(){
   window.scrollTo(0, sy);
   if (View.runner){ bindTimer(); updateLiveMetric(); }
   if (View.player) bindPlayer();
+  bindCallTimer();
 }
 
 /* Le bus relie la couche de données au rendu sans créer de cycle. */

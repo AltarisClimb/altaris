@@ -15,6 +15,7 @@ import { Remote } from "../remote.js";
 import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { sendMessage } from "./library.js";
+import { View } from "./shell.js";
 
 const when = (ms) => new Date(ms).toLocaleString(LOC(), { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" });
 const hour = (ms) => new Date(ms).toLocaleTimeString(LOC(), { hour: "2-digit", minute: "2-digit" });
@@ -34,6 +35,13 @@ function callCard(me){
       '<button class="btn sm" data-act="call-ics" data-v="' + esc(next.id) + '">' + ic("cal") + esc(t("cal.addToAgenda")) + '</button>' +
       (cancellable(next) ? '<button class="btn sm ghost" data-act="call-cancel" data-v="' + esc(next.id) + '">' + esc(t("vc.cancel")) + '</button>' : '') +
     '</div>' +
+    /* Heure de fin, puis « se termine dans X min » pendant les 5 dernières minutes. */
+    (() => {
+      const end = next.start + next.minutes * 60000, left = end - Date.now();
+      return left > 0 && left <= 5 * 60000 && Date.now() >= next.start
+        ? '<div class="notice warn">' + ic("clock") + '<span>' + esc(t("vc.endsIn", { n: Math.ceil(left / 60000) })) + '</span></div>'
+        : '<p class="small muted">' + esc(t("vc.endsAt", { time: hour(end) })) + '</p>';
+    })() +
     '<p class="dim tiny">' + esc(joinable(next) ? t("vc.open") : t("vc.opensAt")) + '</p></div>';
   const used = callUsedThisMonth(Remote.calls, me.id);
   const free = Remote.calls.filter(c => !c.booked_by && c.start > Date.now()).length;
@@ -151,7 +159,7 @@ function gridHtml(me){
       const who = Store.get("users", c.booked_by);
       return '<div class="in-row msg"><span class="in-ic">' + ic("video") + '</span><span class="in-main"><span class="in-who">' + esc(when(c.start)) + '</span>' +
         '<span class="in-what">' + esc(t("vc.bookedBy", { name: who ? who.name : "—" })) + '</span></span>' +
-        '<a class="btn sm pri" href="' + esc(Remote.jitsiUrl(c.room)) + '" target="_blank" rel="noopener noreferrer">' + esc(t("vc.join")) + '</a></div>';
+        '<button class="btn sm pri" data-act="call-join" data-v="' + esc(c.id) + '">' + esc(t("vc.join")) + '</button></div>';
     }).join("") + '</div></div>' : '') +
   '</div>';
 }
@@ -213,7 +221,7 @@ function coachCallsModal(){
         if (!el || justPainted) return;
         if (el.classList.contains("booked")){                       // réservé : ouvrir la visio
           const c = Remote.calls.find(x => x.start === Number(el.dataset.ms) && x.coach_id === me.id);
-          if (c) window.open(Remote.jitsiUrl(c.room), "_blank", "noopener");
+          if (c){ Modal.close(); coachJoin(c.id); }
           return;
         }
         if (el.disabled) return;
@@ -224,4 +232,96 @@ function coachCallsModal(){
   });
 }
 
-export { bookModal, callCard, callIcs, cancelCall, coachCallsModal };
+/* ---------- côté coach : minuteur de la visio ----------
+   La visio a lieu dans Jitsi (autre onglet) : le minuteur vit dans ALTARIS.
+   5 min avant la fin prévue, le grimpeur reçoit un message automatique (et sa
+   notification), le coach une notification système et un bip. L'avertissement
+   part une seule fois par visio, même après un rechargement. */
+const TIMER_KEY = "altaris.callTimer", WARNED_KEY = "altaris.callWarned.";
+const WARN_BEFORE = 5 * 60000;
+let timerTick = null;
+
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k, v){ try{ v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); }catch(e){} }
+
+/** Le coach rejoint : ouvrir Jitsi et lancer le minuteur. */
+function coachJoin(id){
+  const c = Remote.calls.find(x => x.id === id); if (!c) return;
+  window.open(Remote.jitsiUrl(c.room), "_blank", "noopener");
+  View.callTimer = id; lsSet(TIMER_KEY, id);
+  try{ if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }catch(e){}
+  render();
+}
+function closeTimer(){ View.callTimer = null; lsSet(TIMER_KEY, null); render(); }
+/** Au démarrage : reprendre le minuteur d'une visio encore en cours. */
+function restoreTimer(){
+  const id = lsGet(TIMER_KEY); if (!id) return;
+  const c = Remote.calls.find(x => x.id === id);
+  if (c && c.start + c.minutes * 60000 > Date.now() - 10 * 60000) View.callTimer = id; else lsSet(TIMER_KEY, null);
+}
+
+/** Prévenir le grimpeur (automatique à T-5 min, ou bouton « Prévenir maintenant »). */
+async function warnClimber(c, manual){
+  if (lsGet(WARNED_KEY + c.id) && !manual) return;
+  lsSet(WARNED_KEY + c.id, "1");
+  const me = Session.live(), who = Store.get("users", c.booked_by);
+  const left = Math.max(1, Math.round((c.start + c.minutes * 60000 - Date.now()) / 60000));
+  await sendMessage(me.id, c.booked_by, { ctx: t("vc.ctx"), text: "⏱️ " + t("vc.endingSoon", { n: left }) });
+  try{
+    if ("Notification" in window && Notification.permission === "granted")
+      new Notification(t("vc.endingCoach", { n: left, name: who ? who.name.split(" ")[0] : "" }), { body: t("vc.warnedD"), tag: "call-" + c.id });
+  }catch(e){}
+  beepOnce();
+  if (manual) toast(t("vc.warned"), "good");
+}
+function beepOnce(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)(), o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.value = 880; g.gain.value = 0.12; o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.4);
+  }catch(e){}
+}
+
+let restored = false;
+function timerWidget(){
+  if (!Remote.client) return "";
+  /* Après un rechargement : reprendre le minuteur dès que les créneaux sont chargés. */
+  if (!View.callTimer && !restored && Remote.calls.length){ restored = true; restoreTimer(); }
+  if (!View.callTimer) return "";
+  const c = Remote.calls.find(x => x.id === View.callTimer); if (!c) return "";
+  const who = Store.get("users", c.booked_by);
+  return '<div class="ct" id="ct" role="timer" aria-live="off">' +
+    '<div class="ct-top"><span class="ct-who">' + ic("video") + esc(t("vc.title", { name: who ? who.name : "—" })) + '</span>' +
+      '<button class="btn icon xs ghost" data-act="call-timer-close" aria-label="' + esc(t("g.close")) + '">' + ic("x") + '</button></div>' +
+    '<div class="ct-time" id="ct-time">—</div>' +
+    '<div class="ct-bar"><span id="ct-bar"></span></div>' +
+    '<div class="row tight"><a class="btn xs" href="' + esc(Remote.jitsiUrl(c.room)) + '" target="_blank" rel="noopener noreferrer">' + esc(t("vc.backToCall")) + '</a>' +
+      '<button class="btn xs ghost" data-act="call-warn" data-v="' + esc(c.id) + '"' + (lsGet(WARNED_KEY + c.id) ? ' disabled' : '') + '>' + esc(t("vc.warnNow")) + '</button></div>' +
+  '</div>';
+}
+
+/** Repeint le minuteur chaque seconde et déclenche l'avertissement à T-5 min. */
+function bindCallTimer(){
+  if (timerTick){ clearInterval(timerTick); timerTick = null; }
+  if (!View.callTimer) return;
+  const paint = () => {
+    const c = Remote.calls.find(x => x.id === View.callTimer);
+    const el = document.getElementById("ct"); if (!c || !el){ clearInterval(timerTick); timerTick = null; return; }
+    const end = c.start + c.minutes * 60000, now = Date.now();
+    const notStarted = now < c.start, left = Math.max(0, end - (notStarted ? c.start : now));
+    const s = Math.ceil((notStarted ? c.start - now : left) / 1000);
+    document.getElementById("ct-time").textContent = notStarted ? t("vc.startsIn", { t: fmtMs(s) })
+      : left > 0 ? t("vc.left", { t: fmtMs(s) }) : t("vc.over");
+    document.getElementById("ct-bar").style.width = (notStarted ? 0 : Math.min(100, 100 * (now - c.start) / (c.minutes * 60000))) + "%";
+    el.classList.toggle("warn", !notStarted && left <= WARN_BEFORE && left > 0);
+    el.classList.toggle("over", left <= 0);
+    if (!notStarted && left <= WARN_BEFORE && left > 0 && !lsGet(WARNED_KEY + c.id)){
+      warnClimber(c, false);
+      const b = el.querySelector("[data-act=call-warn]"); if (b) b.disabled = true;
+    }
+  };
+  paint();
+  timerTick = setInterval(paint, 1000);
+}
+function fmtMs(s){ return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }
+
+export { bindCallTimer, bookModal, callCard, callIcs, cancelCall, closeTimer, coachCallsModal, coachJoin, restoreTimer, timerWidget, warnClimber };

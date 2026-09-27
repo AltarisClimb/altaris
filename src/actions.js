@@ -12,7 +12,7 @@ import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, dele
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
-import { bookModal, callIcs, cancelCall, coachCallsModal } from "./views/calls.js";
+import { bookModal, callIcs, cancelCall, closeTimer, coachCallsModal, coachJoin, warnClimber } from "./views/calls.js";
 import { calDate, calMode, shiftDate } from "./views/calendar.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
@@ -63,7 +63,10 @@ const ACTIONS = {
   "call-cancel": (v) => cancelCall(v),
   "call-ics": (v) => callIcs(v),
   "call-slots": () => coachCallsModal(),
-  "call-join": (v) => { const c = Remote.calls.find(x => x.id === v); if (c) window.open(Remote.jitsiUrl(c.room), "_blank", "noopener"); },
+  /* Le coach rejoint : Jitsi s'ouvre et le minuteur démarre dans ALTARIS. */
+  "call-join": (v) => coachJoin(v),
+  "call-timer-close": () => closeTimer(),
+  "call-warn": async (v) => { const c = Remote.calls.find(x => x.id === v); if (c){ await warnClimber(c, true); render(); } },
   "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
   "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
   "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },
