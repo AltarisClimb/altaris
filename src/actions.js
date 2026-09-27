@@ -13,6 +13,7 @@ import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
 import { bookModal, callIcs, cancelCall, coachCallsModal } from "./views/calls.js";
+import { calDate, calMode, shiftDate } from "./views/calendar.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { sessionsOf } from "./views/climber.js";
@@ -117,7 +118,11 @@ const ACTIONS = {
     audit("account_status", u.name + " → " + (u.status === "suspended" ? "active" : "suspended"));
   },
   "acwr-m": (v) => { View.acwrMethod = v; render(); },
-  week: (v) => { View.weekOf = v === "0" ? weekStart(today()) : addDays(View.weekOf, Number(v) * 7); render(); },
+  /* --- calendrier : vue (jour, semaine, mois, année) et navigation --- */
+  "cal-mode": (v) => { View.calMode = v; render(); },
+  "cal-nav": (v) => { View.calDate = shiftDate(calMode(), calDate(), Number(v)); render(); },
+  "cal-go": (v) => { View.calDate = v; View.calMode = "day"; window.scrollTo(0,0); render(); },
+  "cal-month": (v) => { View.calDate = v; View.calMode = "month"; window.scrollTo(0,0); render(); },
   athlete: (v) => { View.athlete = v || null; window.scrollTo(0,0); render(); },
   /* Depuis « À traiter » : ouvrir la fiche du grimpeur dans l'onglet Athlètes. */
   "athlete-go": (v) => { View.tab = "athletes"; View.athlete = v || null; window.scrollTo(0,0); render(); },

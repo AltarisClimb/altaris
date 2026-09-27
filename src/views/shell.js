@@ -13,7 +13,8 @@ const View = {
   tab: null,
   athlete: null,          // coach drilling into one athlete file
   exFilter: { cat:"all", lv:"all", q:"" },
-  weekOf: weekStart(today()),
+  calMode: "week",            // calendrier : "day" | "week" | "month" | "year"
+  calDate: null,              // date de référence (null = aujourd'hui)
   calFor: null,           // whose calendar a coach is looking at
   acwrMethod: null,
   thread: null,

@@ -1,7 +1,7 @@
-import { addDays, diffDays, esc, sum, today } from "../core.js";
+import { addDays, diffDays, esc, sum, today, weekStart } from "../core.js";
 import { Store, config } from "../data.js";
 import { Remote } from "../remote.js";
-import { sessionStart, upcomingForAgenda } from "../domain/calendar.js";
+import { sessionStart, upcomingForAgenda, weekdayIndex } from "../domain/calendar.js";
 import { exById, exName } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, band, latestAssessment, limiters } from "../domain/scoring.js";
@@ -9,6 +9,7 @@ import { acwrZone, computeACWR, monotonyStrain } from "../domain/workload.js";
 import { LI, fmtDate, fmtNum, relDays, t } from "../i18n/index.js";
 import { acwrGauge, acwrSeries, radarChart, typeBars, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
+import { calDate, calMode, calToolbar, monthView, yearView } from "./calendar.js";
 import { DAYS } from "./onboarding.js";
 import { progressPanel } from "./progress.js";
 import { TYPE_COLOR } from "./today.js";
@@ -180,7 +181,8 @@ function sessionCard(s, showAction){
 function planningGrid(user){
   const asCoach = true;
   const u = user, p = u.profile || {};
-  const ws = View.weekOf;
+  const mode = calMode();
+  const ws = weekStart(calDate());
   const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
   const all = sessionsOf(u.id);
   const inWeek = all.filter(s => days.indexOf(s.date) >= 0);
@@ -188,16 +190,21 @@ function planningGrid(user){
   const actualLoad  = sum(inWeek.filter(s => s.status === "done").map(s => s.load||0));
   const avail = p.availability || [];
 
-  return '<div class="stack lg">' +
-    '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
-      '<h2>' + esc(asCoach ? u.name : t("nav.calendar")) + '</h2>' +
-      '<p>' + esc(fmtDate(ws, {day:"numeric",month:"long"})) + ' — ' + esc(fmtDate(addDays(ws,6), {day:"numeric",month:"long",year:"numeric"})) + '</p></div>' +
+  const head = '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
+      '<h2>' + esc(asCoach ? u.name : t("nav.calendar")) + '</h2></div>' +
       '<div class="row tight noprint">' +
-        '<button class="btn icon sm ghost" data-act="week" data-v="-1" aria-label="' + esc(t("g.previous")) + '">' + ic("chevL") + '</button>' +
-        '<button class="btn sm ghost" data-act="week" data-v="0">' + esc(t("g.today")) + '</button>' +
-        '<button class="btn icon sm ghost" data-act="week" data-v="1" aria-label="' + esc(t("g.next")) + '">' + ic("chevR") + '</button>' +
-        (asCoach ? '<button class="btn sm pri" data-act="block-new" data-v="' + esc(u.id) + '">' + ic("plus") + esc(t("cal.addBlock")) + '</button>' : '') +
-      '</div></div>' +
+        (asCoach ? '<button class="btn sm pri" data-act="block-new" data-v="' + esc(u.id) + '"' + (mode === "day" ? ' data-d="' + calDate() + '"' : '') + '>' +
+          ic("plus") + esc(t("cal.addBlock")) + '</button>' : '') +
+      '</div></div>' + calToolbar();
+
+  /* Mois, Année, Jour : vues partagées. La Semaine garde la grille de planification ci-dessous. */
+  if (mode === "month") return '<div class="stack lg">' + head +
+    '<div class="notice">' + ic("info") + '<span>' + esc(t("cal.dragHint")) + '</span></div>' +
+    '<div class="panel pad">' + monthView(all, p, { asCoach: true, userId: u.id }) + '</div></div>';
+  if (mode === "year") return '<div class="stack lg">' + head + '<div class="panel pad">' + yearView(all) + '</div></div>';
+  if (mode === "day") return '<div class="stack lg">' + head + '<div class="panel ag">' + dayBlock(u, calDate(), true) + '</div></div>';
+
+  return '<div class="stack lg">' + head +
 
     '<div class="grid g4">' +
       kpi(t("cal.plannedLoad"), fmtNum(plannedLoad), t("ld.au"), t("ld.formula")) +
@@ -262,9 +269,39 @@ function sessionStatus(s){
 }
 
 /* Grimpeur : agenda lisible, la prochaine séance en tête, puis la semaine jour par jour. */
+/** Une journée : séances dans l'ordre de l'heure (ou « Repos » et les créneaux dispo).
+ *  asCoach : chaque ligne ouvre la fiche, et un bouton pose une séance ce jour-là. */
+function dayBlock(u, d, asCoach){
+  const p = u.profile || {};
+  const list = sessionsOf(u.id).filter(s => s.date === d).sort(byTime(p));
+  const slots = (p.availability || []).filter(a => a.day === weekdayIndex(d));
+  const isToday = d === today();
+  return '<div class="ag-day' + (isToday ? ' today' : '') + (diffDays(today(), d) > 0 ? ' past' : '') + '">' +
+    '<div class="ag-dh">' + esc(fmtDate(d, { weekday: "long", day: "numeric", month: "long" })) +
+      (isToday ? ' <span class="chip acc">' + esc(t("g.today")) + '</span>' : '') + '</div>' +
+    (list.length ? list.map(s => {
+      const st = sessionStatus(s), tm = sessionStart(s, p);
+      const due = !asCoach && st[1] === "warn";
+      return '<button class="ag-row" data-act="' + (due ? 'validate' : 'session-open') + '" data-v="' + esc(s.id) + '" style="--type:' + (TYPE_COLOR[s.type] || 'var(--accent)') + '">' +
+        '<span class="ag-time">' + esc(tm || "—") + '</span>' +
+        '<span class="ag-main"><span class="ag-t">' + esc(s.title) + '</span>' +
+          '<span class="ag-m">' + esc(t("st." + s.type)) + (s.type === "rest" ? '' : ' · ' + esc(fmtDuration(s.status === "done" ? s.actualMin : s.plannedMin)) +
+            ' · ' + esc(t("cal.intensity", { n: s.targetIntensity || 5 }))) + '</span></span>' +
+        (s.kudos ? '<span class="chip acc" title="' + esc(t("kd.from", { name: s.kudos.name })) + '">' + esc(s.kudos.emoji) + '</span>' : '') +
+        '<span class="chip ' + st[1] + '">' + esc(st[0]) + '</span>' + ic("chevR", "chev") +
+      '</button>';
+    }).join("")
+    : '<div class="ag-empty">' + esc(t("cal.rest")) +
+        (slots.length ? ' · ' + slots.map(a => esc(t("cal.availSlot", { start: a.start, end: a.end }))).join(", ") : '') + '</div>') +
+    (asCoach ? '<div class="noprint" style="padding:6px 4px 2px"><button class="btn xs ghost" data-act="block-new" data-v="' + esc(u.id) + '" data-d="' + d + '">' +
+      ic("plus") + esc(t("cal.addBlock")) + '</button></div>' : '') +
+  '</div>';
+}
+
 function agenda(u){
   const p = u.profile || {};
-  const ws = View.weekOf;
+  const mode = calMode();
+  const ws = weekStart(calDate());
   const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
   const all = sessionsOf(u.id);
   const inWeek = all.filter(s => days.indexOf(s.date) >= 0 && s.type !== "rest");
@@ -298,40 +335,13 @@ function agenda(u){
           ic("check") + esc(t("ov.validate")) + '</button>' : '') + '</div>' +
     '</div>' : '') +
 
-    '<div class="between noprint">' +
-      '<div class="row tight">' +
-        '<button class="btn icon sm ghost" data-act="week" data-v="-1" aria-label="' + esc(t("g.previous")) + '">' + ic("chevL") + '</button>' +
-        '<button class="btn sm ghost" data-act="week" data-v="0">' + esc(t("cal.thisWeek")) + '</button>' +
-        '<button class="btn icon sm ghost" data-act="week" data-v="1" aria-label="' + esc(t("g.next")) + '">' + ic("chevR") + '</button>' +
-      '</div>' +
-      '<span class="small muted">' + esc(fmtDate(ws, { day: "numeric", month: "short" })) + ' – ' +
-        esc(fmtDate(addDays(ws, 6), { day: "numeric", month: "short" })) + '</span>' +
-    '</div>' +
-    (inWeek.length ? '<p class="small muted">' + esc(t("cal.weekSummary", { done: doneN, total: inWeek.length, time: fmtDuration(plannedMin) })) + '</p>' : '') +
+    calToolbar() +
+    (mode === "week" && inWeek.length ? '<p class="small muted">' + esc(t("cal.weekSummary", { done: doneN, total: inWeek.length, time: fmtDuration(plannedMin) })) + '</p>' : '') +
 
-    '<div class="panel ag">' + days.map((d, di) => {
-      const list = all.filter(s => s.date === d).sort(byTime(p));
-      const slots = avail.filter(a => a.day === di);
-      const isToday = d === today();
-      return '<div class="ag-day' + (isToday ? ' today' : '') + (diffDays(today(), d) > 0 ? ' past' : '') + '">' +
-        '<div class="ag-dh">' + esc(fmtDate(d, { weekday: "long", day: "numeric", month: "long" })) +
-          (isToday ? ' <span class="chip acc">' + esc(t("g.today")) + '</span>' : '') + '</div>' +
-        (list.length ? list.map(s => {
-          const st = sessionStatus(s), tm = sessionStart(s, p);
-          const due = st[1] === "warn";
-          return '<button class="ag-row" data-act="' + (due ? 'validate' : 'session-open') + '" data-v="' + esc(s.id) + '" style="--type:' + (TYPE_COLOR[s.type] || 'var(--accent)') + '">' +
-            '<span class="ag-time">' + esc(tm || "—") + '</span>' +
-            '<span class="ag-main"><span class="ag-t">' + esc(s.title) + '</span>' +
-              '<span class="ag-m">' + esc(t("st." + s.type)) + (s.type === "rest" ? '' : ' · ' + esc(fmtDuration(s.status === "done" ? s.actualMin : s.plannedMin)) +
-                ' · ' + esc(t("cal.intensity", { n: s.targetIntensity || 5 }))) + '</span></span>' +
-            (s.kudos ? '<span class="chip acc" title="' + esc(t("kd.from", { name: s.kudos.name })) + '">' + esc(s.kudos.emoji) + '</span>' : '') +
-            '<span class="chip ' + st[1] + '">' + esc(st[0]) + '</span>' + ic("chevR", "chev") +
-          '</button>';
-        }).join("")
-        : '<div class="ag-empty">' + esc(t("cal.rest")) +
-            (slots.length ? ' · ' + slots.map(a => esc(t("cal.availSlot", { start: a.start, end: a.end }))).join(", ") : '') + '</div>') +
-      '</div>';
-    }).join("") + '</div>' +
+    (mode === "month" ? '<div class="panel pad">' + monthView(all, p, {}) + '</div>'
+     : mode === "year" ? '<div class="panel pad">' + yearView(all) + '</div>'
+     : mode === "day" ? '<div class="panel ag">' + dayBlock(u, calDate(), false) + '</div>'
+     : '<div class="panel ag">' + days.map(d => dayBlock(u, d, false)).join("") + '</div>') +
 
     '<p class="dim tiny noprint">' + esc(t("cal.addToAgendaD")) + '</p>' +
 

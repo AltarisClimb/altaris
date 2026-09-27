@@ -641,3 +641,50 @@ main > *{animation:fade-up .22s ease both}
 /* ---------- visio (Premium) ---------- */
 .vc-card{border-color:var(--accent-line)}
 .btn.off{opacity:.45; pointer-events:none}
+
+/* ---------- calendrier multi-vues (jour, semaine, mois, année) ---------- */
+.cal-bar{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px}
+.cal-title{display:inline-block; font-family:var(--serif); font-size:20px; font-weight:600; margin-left:6px}
+.cal-title::first-letter{text-transform:uppercase}
+/* Mois */
+.mo{display:flex; flex-direction:column; gap:4px}
+.mo-head, .mo-row{display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:4px}
+.mo-head span{font:600 10px/1 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); text-align:center; padding:4px 0}
+.mo-cell{position:relative; min-height:104px; padding:4px; border-radius:8px; background:var(--surface-2);
+  border:1px solid var(--line-soft); display:flex; flex-direction:column; gap:3px; min-width:0}
+.mo-cell.out{opacity:.4}
+.mo-cell.today{border-color:var(--accent-line); background:var(--accent-wash)}
+.mo-cell.drop{border-color:var(--accent); border-style:dashed}
+.mo-d{align-self:flex-start; font:600 12px/1 var(--mono); color:var(--ink-2); padding:4px 6px; border-radius:999px}
+.mo-cell.today .mo-d{background:var(--accent); color:var(--accent-ink)}
+.mo-d:hover{background:var(--surface-3)}
+.mo-ev{display:flex; gap:4px; align-items:baseline; width:100%; text-align:left; font-size:11px; line-height:1.25; padding:2px 5px;
+  border-radius:5px; background:color-mix(in srgb, var(--type) 18%, transparent); border-left:3px solid var(--type); min-width:0}
+.mo-ev.done{opacity:.7} .mo-ev.missed{text-decoration:line-through; opacity:.6}
+.mo-ev[draggable="true"]{cursor:grab}
+.mo-t{font-family:var(--mono); font-size:10px; color:var(--ink-2); flex:none}
+.mo-n{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:600}
+.mo-more{font-size:11px; font-weight:600; color:var(--accent); text-align:left; padding:0 5px}
+.mo-add{position:absolute; right:3px; top:3px; opacity:0; color:var(--ink-3); padding:2px}
+.mo-cell:hover .mo-add{opacity:.8}
+.mo-add svg{width:14px; height:14px}
+@media (max-width:640px){
+  .mo-cell{min-height:64px; padding:3px; gap:2px; flex-direction:row; flex-wrap:wrap; align-content:flex-start}
+  .mo-d{width:100%; padding:2px 2px 3px; font-size:11px}
+  .mo-ev{width:9px; height:9px; padding:0; border:0; border-radius:50%; background:var(--type)}
+  .mo-ev .mo-t, .mo-ev .mo-n{display:none}
+  .mo-more{font-size:10px; padding:0 2px}
+  .mo-add{display:none}
+}
+/* Année */
+.yr{display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:18px 22px}
+.yr-h{display:flex; align-items:center; gap:8px; font-family:var(--serif); font-size:17px; font-weight:600; text-transform:capitalize; margin-bottom:6px}
+.yr-h .n{font:600 10px/1 var(--mono); padding:3px 6px; border-radius:999px; background:var(--accent-wash); color:var(--accent)}
+.yr-g{display:grid; grid-template-columns:repeat(7, 1fr); gap:2px}
+.yr-w{font:600 9px/1 var(--sans); color:var(--ink-3); text-align:center; padding:3px 0}
+.yr-d{aspect-ratio:1; display:grid; place-items:center; font:500 11px/1 var(--mono); color:var(--ink-2); border-radius:50%}
+.yr-d.out{visibility:hidden}
+.yr-d.has{background:color-mix(in srgb, var(--type) 28%, transparent); color:var(--ink); font-weight:700}
+.yr-d.has.done{background:var(--type); color:var(--bg)}
+.yr-d.today{box-shadow:inset 0 0 0 2px var(--accent)}
+.yr-d:hover{background:var(--surface-3)}
