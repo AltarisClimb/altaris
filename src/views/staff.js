@@ -1,5 +1,5 @@
 import { byId, diffDays, esc, iso, sum, today } from "../core.js";
-import { Access, Store, config } from "../data.js";
+import { Access, Session, Store, config } from "../data.js";
 import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, fontLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, latestAssessment, limiters } from "../domain/scoring.js";
 import { weekProgress } from "../domain/progress.js";
@@ -192,6 +192,7 @@ function viewAccounts(){
           '<td class="n noprint"><span class="row tight nowrap" style="justify-content:flex-end">' +
             '<button class="btn xs ghost" data-act="acct-edit" data-v="' + esc(u.id) + '">' + ic("edit") + '</button>' +
             '<button class="btn xs ghost" data-act="acct-toggle" data-v="' + esc(u.id) + '">' + esc(u.status==="suspended"?t("ad.reactivate"):t("ad.suspend")) + '</button>' +
+            (u.id !== (Session.user && Session.user.id) ? '<button class="btn xs ghost" data-act="acct-delete" data-v="' + esc(u.id) + '" title="' + esc(t("ad.delete")) + '" aria-label="' + esc(t("ad.delete")) + '" style="color:var(--crit)">' + ic("trash") + '</button>' : '') +
           '</span></td></tr>';
       }).join("") + '</tbody></table></div></div>' +
 

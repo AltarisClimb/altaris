@@ -6,7 +6,7 @@ import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./doma
 import { FONT, SPORT, fontLabel } from "./domain/grades.js";
 import { sessionLoad } from "./domain/workload.js";
 import { LANG, LI, fmtDateLong, fmtNum, t } from "./i18n/index.js";
-import { body } from "./main.js";
+import { body, render } from "./main.js";
 import { topo } from "./ui/brand.js";
 import { Modal, toast } from "./ui/feedback.js";
 import { ic } from "./ui/icons.js";
@@ -442,6 +442,43 @@ function videoCheckModal(){
   });
 }
 
+/* ---------------- suppression définitive d'un compte (admin) ----------------
+   Il faut taper le mot demandé pour activer le bouton : pas de suppression par erreur. */
+function deleteAccountModal(id){
+  const u = Store.get("users", id); if (!u) return;
+  const me = Session.live();
+  if (!me || me.role !== "admin" || me.id === id) return;
+  const word = t("ad.deleteWord");
+  Modal.open({
+    title: t("ad.deleteTitle", { name: u.name }),
+    body: '<div class="stack">' +
+      '<div class="notice crit">' + ic("alert") + '<span>' + esc(t("ad.deleteD")) + '</span></div>' +
+      '<ul class="small muted" style="line-height:1.55;padding-left:18px;margin:0">' +
+        '<li>' + esc(t("ad.deleteWhat")) + '</li>' +
+        (u.role !== "climber" ? '<li>' + esc(t("ad.deleteCoach")) + '</li>' : '') +
+        '<li>' + esc(t("ad.deleteKeeps")) + '</li></ul>' +
+      '<label class="f"><span class="lb">' + esc(t("ad.deleteType", { word })) + '</span>' +
+        '<input class="inp" id="del-word" autocomplete="off" autocapitalize="characters"></label>' +
+    '</div>',
+    footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button>' +
+            '<button class="btn danger" id="del-ok" disabled>' + ic("trash") + esc(t("ad.delete")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      const ok = $("#del-ok", root);
+      $("#del-word", root).oninput = (e) => { ok.disabled = e.target.value.trim().toUpperCase() !== word; };
+      ok.onclick = async () => {
+        ok.disabled = true;
+        try{ if (Remote.client) await Remote.deleteUser(id); }
+        catch(e){ ok.disabled = false; return toast(t("er.saveFailed"), "crit"); }
+        Store.forgetUser(id);
+        audit("account_deleted", u.name + " (" + u.role + ")");
+        Modal.close(); toast(t("ad.deleted", { name: u.name }), "good");
+        render();
+      };
+    }
+  });
+}
+
 /* ---------------- « Bravo » du coach sur une séance validée ----------------
    Enregistré sur la séance (le grimpeur le voit dans son programme) et envoyé
    comme message (il est notifié). */
@@ -549,4 +586,4 @@ function withHealthConsent(action){
   healthConsentModal(() => action());
 }
 
-export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };
+export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

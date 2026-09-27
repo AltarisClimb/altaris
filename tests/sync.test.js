@@ -196,3 +196,20 @@ test("à la déconnexion, les données rendues par le serveur sont effacées de 
     delete globalThis.localStorage;
   }
 });
+
+test("compte supprimé : ses données disparaissent de l'appareil, ses grimpeurs n'ont plus de coach", () => {
+  Store.data.sessions["s-a"] = { id: "s-a", userId: ATH };
+  Store.data.sessions["s-o"] = { id: "s-o", userId: OTHER };
+  Store.data.pain["p-a"] = { id: "p-a", userId: ATH };
+  Store.data.routines["r-c"] = { id: "r-c", coachId: COACH };
+  Store.data.threads[ATH] = { id: ATH, athleteId: ATH, messages: [] };
+  Store.forgetUser(ATH);
+  assert.equal(Store.data.users[ATH], undefined);
+  assert.deepEqual(Object.keys(Store.data.sessions), ["s-o"]);
+  assert.deepEqual(Store.data.pain, {});
+  assert.equal(Store.data.threads[ATH], undefined);
+  Store.data.users[ATH] = { id: ATH, role: "climber", coachId: COACH };
+  Store.forgetUser(COACH);
+  assert.equal(Store.data.users[ATH].coachId, null);
+  assert.deepEqual(Store.data.routines, {});
+});

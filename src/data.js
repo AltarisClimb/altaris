@@ -93,6 +93,22 @@ const Store = {
   /** Superpose les comptes Supabase aux documents "users" en cache.
    *  Les champs locaux (profile, plan…) sont conservés ; les comptes du mode
    *  PIN, qui n'existent pas côté serveur, sont écartés. */
+  /** Compte supprimé : retirer aussi de cet appareil tout ce qui le concerne. */
+  forgetUser(userId){
+    delete (this.data.users || {})[userId];
+    for (const col of COLS){
+      if (col === "users" || col === "config" || col === "audit") continue;
+      for (const d of Object.values(this.data[col] || {}))
+        if (d.userId === userId || (col === "routines" && d.coachId === userId) ||
+            (col === "threads" && (d.participants || []).includes(userId))) delete this.data[col][d.id];
+    }
+    if (this.data.threads) delete this.data.threads[userId];            // conversation (mode Supabase)
+    for (const u of Object.values(this.data.users || {}))
+      if (u.coachId === userId) this.data.users[u.id] = Object.assign({}, u, { coachId: null });
+    this.queue = this.queue.filter(q => !(q.doc && q.doc.userId === userId));
+    this.saveLocal();
+  },
+
   mergeUsers(list){
     const prev = this.data.users || {};
     const next = {};

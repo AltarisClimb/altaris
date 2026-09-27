@@ -215,6 +215,29 @@ select t.as(:S1); set role authenticated;
 select t.ok('S1 cannot see S2 at all', (select count(*) from profiles where id = :S2) = 0);
 reset role;
 
+-- ================= account deletion
+-- Give S2 some data first (as postgres): a session, a message, a device.
+insert into athlete_docs (col, id, athlete_id, data) values ('sessions', 's-del', :S2, '{}');
+insert into messages (athlete_id, sender_id, body) values (:S2, :S2, 'to be erased');
+insert into push_subscriptions (endpoint, user_id, p256dh, auth) values ('https://push.example/del', :S2, 'k', 'a');
+select t.as(:T1); set role authenticated;
+select t.err('a coach cannot delete an account', 'select public.admin_delete_user(' || quote_literal(:S2) || ')');
+reset role;
+select t.as(:S1); set role authenticated;
+select t.err('a climber cannot delete an account', 'select public.admin_delete_user(' || quote_literal(:S2) || ')');
+reset role;
+select t.as(:A); set role authenticated;
+select t.err('an admin cannot delete themselves', 'select public.admin_delete_user(' || quote_literal(:A) || ')');
+select t.ok('admin deletes S2', (select count(*) from (select public.admin_delete_user(:S2)) x) = 1);
+reset role;
+select t.ok('S2 login is gone', (select count(*) from auth.users where id = :S2) = 0);
+select t.ok('S2 profile is gone', (select count(*) from profiles where id = :S2) = 0);
+select t.ok('S2 sessions and health data are gone', (select count(*) from athlete_docs where athlete_id = :S2) = 0);
+select t.ok('S2 conversation is gone', (select count(*) from messages where athlete_id = :S2) = 0);
+select t.ok('S2 devices are gone', (select count(*) from push_subscriptions where user_id = :S2) = 0);
+select t.err('anon cannot delete accounts', 'set role anon; select public.admin_delete_user(' || quote_literal(:S1) || ')');
+reset role;
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

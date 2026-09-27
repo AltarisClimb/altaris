@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
@@ -93,6 +93,7 @@ const ACTIONS = {
   "export-mine": () => saveFile("altaris-" + (Session.live()||{}).name + "-" + today() + ".json", JSON.stringify(exportPayload("mine"), null, 2)),
   "profile-edit": () => profileEditModal(),
   "acct-edit": (v) => accountEditModal(v),
+  "acct-delete": (v) => deleteAccountModal(v),
   "acct-toggle": async (v) => {
     const u = Store.get("users", v); if (!u) return;
     if (!await Store.put("users", v, Object.assign({}, u, { status: u.status === "suspended" ? "active" : "suspended" }))) return;

@@ -304,6 +304,12 @@ const Remote = {
     await this.client.from("profiles").update({ timezone: tz, lang }).eq("id", user.id);
   },
 
+  /** Suppression définitive d'un compte (admin uniquement, vérifié par le serveur). */
+  async deleteUser(id){
+    const { error } = await this.client.rpc("admin_delete_user", { target: id });
+    if (error) throw error;
+  },
+
   async updateProfile(id, patch){
     /* Une ligne refusée par la RLS ne renvoie pas d'erreur, juste zéro ligne. */
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
