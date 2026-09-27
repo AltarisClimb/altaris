@@ -30,6 +30,7 @@ function viewAuthRemote(){
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
         pwField("li-pass", ' data-fk="li-pass" type="password" autocomplete="current-password" required') + '</label>' +
       '<div id="li-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
+      '<button class="btn sm" type="button" id="li-resend" data-act="resend-confirm" style="display:none">' + ic("send") + esc(t("auth.resend")) + '</button>' +
       '<button class="btn pri wide" type="submit">' + esc(t("auth.signIn")) + '</button>' +
       '<button class="btn ghost sm" type="button" data-act="remote-forgot">' + esc(t("auth.forgot")) + '</button>' +
     '</form>' +
@@ -59,8 +60,14 @@ function authMessage(err){
 async function remoteSignIn(){
   const mail = $("#li-mail").value.trim(), pass = $("#li-pass").value;
   if (!mail || !pass) return authError(document, t("er.required"));
+  const resend = $("#li-resend");
+  if (resend) resend.style.display = "none";
   try{ await Remote.signIn(mail, pass); }
-  catch(e){ return authError(document, authMessage(e)); }
+  catch(e){
+    /* Compte pas encore activé : proposer de renvoyer l'e-mail de confirmation. */
+    if (e && e.code === "email_not_confirmed" && resend) resend.style.display = "";
+    return authError(document, authMessage(e));
+  }
   const state = await Session.restoreRemote();
   if (state === "suspended") return authError(document, t("auth.suspended"));
   if (!Session.user) return authError(document, t("auth.noProfile"));
@@ -73,6 +80,45 @@ function enter(u){
   Store.startRemote();
   View.tab = TABS[u.role][0][0];
   render();
+}
+
+/* ---------------- e-mail de confirmation : renvoi ----------------
+   Supabase limite les envois ; le bouton attend 60 s entre deux renvois. */
+const RESEND_WAIT = 60;
+async function resendConfirmation(email, btn){
+  if (!email) return toast(t("auth.forgotNeedsMail"), "crit");
+  const label = btn.innerHTML;
+  btn.disabled = true;
+  try{ await Remote.resendConfirmation(email); toast(t("auth.resent", { email }), "good"); }
+  catch(e){ btn.disabled = false; return toast(authMessage(e), "crit"); }
+  let left = RESEND_WAIT;
+  btn.textContent = t("auth.resendIn", { n: left });
+  const timer = setInterval(() => {
+    left--;
+    if (!btn.isConnected || left <= 0){ clearInterval(timer); btn.disabled = false; btn.innerHTML = label; return; }
+    btn.textContent = t("auth.resendIn", { n: left });
+  }, 1000);
+}
+
+/** Depuis l'écran de connexion (compte pas encore activé). */
+function resendFromLogin(el){ resendConfirmation($("#li-mail").value.trim(), el); }
+
+/** Après l'inscription : vérifier sa boîte mail, avec renvoi possible. */
+function checkMailModal(email){
+  Modal.open({
+    title: t("auth.checkMail"),
+    body: '<div class="stack center">' +
+      '<div class="pl-burst" style="--type:var(--accent)">' + ic("send") + '</div>' +
+      '<p style="line-height:1.6">' + esc(t("auth.checkMailD", { email })) + '</p>' +
+      '<p class="small muted" style="line-height:1.55">' + esc(t("auth.checkSpam")) + '</p>' +
+    '</div>',
+    footer: '<button class="btn" id="cm-resend">' + ic("send") + esc(t("auth.resend")) + '</button>' +
+            '<button class="btn pri" data-c>' + esc(t("g.close")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      $("#cm-resend", root).onclick = (e) => resendConfirmation(email, e.currentTarget);
+    }
+  });
 }
 
 async function remoteForgot(){
@@ -112,7 +158,7 @@ function remoteSignUpModal(){
         try{ signedIn = await Remote.signUp(mail, pass, { first: personName(first, ""), last: personName("", last), full: name }); }
         catch(e){ return authError(root, authMessage(e)); }
         Modal.close();
-        if (!signedIn){ toast(t("auth.confirmSent"), "good"); return; }
+        if (!signedIn){ checkMailModal(mail); return; }
         await Session.restoreRemote();
         if (!Session.user) return toast(t("auth.noProfile"), "crit");
         audit("account_created", Session.user.role);
@@ -255,4 +301,4 @@ function newAccountModal(){
   });
 }
 
-export { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, viewAuth, viewSetPassword };
+export { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin, viewAuth, viewSetPassword };

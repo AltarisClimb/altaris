@@ -320,6 +320,13 @@ const Remote = {
     return !!data.session;
   },
 
+  /** Renvoie l'e-mail de confirmation d'inscription (compte pas encore activé). */
+  async resendConfirmation(email){
+    const { error } = await this.client.auth.resend({ type: "signup", email,
+      options: { emailRedirectTo: location.origin + location.pathname } });
+    if (error) throw error;
+  },
+
   async resetPassword(email){
     const { error } = await this.client.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
     if (error) throw error;

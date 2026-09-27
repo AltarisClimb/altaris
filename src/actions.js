@@ -11,7 +11,7 @@ import { render, renderDebounced } from "./main.js";
 import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
-import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn } from "./views/auth.js";
+import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { sessionsOf } from "./views/climber.js";
@@ -46,6 +46,7 @@ const ACTIONS = {
     el.setAttribute("aria-pressed", String(show));
   },
   "remote-forgot": () => remoteForgot(),
+  "resend-confirm": (v, el) => resendFromLogin(el),
   "remote-setpass": () => remoteSetPassword(),
   "seed-demo": () => seedDemo(),
   "purge-demo": () => { if (confirm(t("ad.purgeConfirm"))) purgeDemo(); },
