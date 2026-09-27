@@ -1,5 +1,6 @@
 import { requestRender } from "./bus.js";
 import { LANG, t } from "./i18n/index.js";
+import { FEATURES, effectivePlan } from "./domain/plans.js";
 import { Remote, profilePatch } from "./remote.js";
 import { toast } from "./ui/feedback.js";
 /* ================================================================
@@ -16,6 +17,9 @@ const REMOTE_COLS = ["sessions", "assessments", "pain"];
 /* Données de santé (RGPD art. 9) : envoyées seulement si le grimpeur a donné
    son consentement explicite ; le serveur le vérifie aussi (RLS). */
 const HEALTH_COLS = ["assessments", "pain"];
+/** Formule du compte (essai, standard, premium, expired, staff). En mode local tout est ouvert. */
+function planOf(u){ return Remote.client ? effectivePlan(u) : "staff"; }
+function can(u, feature){ return FEATURES[planOf(u)][feature]; }
 /** Consentement santé : sans objet en mode local (rien ne quitte l'appareil). */
 function hasHealthConsent(u){ return !Remote.client || !!(u && u.healthConsentAt); }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -206,6 +210,8 @@ const Store = {
     await this.flushRemote();
     /* Comptes relus aussi : rôles, rattachements et « vu il y a… » à jour. */
     try{ this.mergeUsers(await Remote.profiles()); }catch(e){ /* hors ligne : cache */ }
+    /* Admin : demandes de formule en attente, pour « À traiter ». */
+    if (Session.user.role === "admin") try{ Remote.requests = await Remote.planRequests(); }catch(e){}
     for (const col of REMOTE_COLS){
       let rows;
       try{ rows = await Remote.docs(col); }catch(e){ continue; }             // hors ligne : on garde le cache
@@ -482,4 +488,4 @@ const Access = {
   }
 };
 
-export { Access, COLS, DEFAULT_CONFIG, HEALTH_COLS, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, config, fromDocRow, fromMessageRow, hasHealthConsent, isNetworkError, touch };
+export { Access, COLS, DEFAULT_CONFIG, HEALTH_COLS, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, can, config, fromDocRow, fromMessageRow, hasHealthConsent, isNetworkError, planOf, touch };

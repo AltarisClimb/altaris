@@ -1,5 +1,5 @@
 import { $, $$, addDays, clamp, esc, today, uid, weekStart } from "./core.js";
-import { Access, Session, Store, audit, config } from "./data.js";
+import { Access, Session, Store, audit, can, config } from "./data.js";
 import { buildICS, upcomingForAgenda } from "./domain/calendar.js";
 import { trackFor } from "./domain/grades.js";
 import { batteryFor, scoreAssessment } from "./domain/scoring.js";
@@ -8,7 +8,7 @@ import { downloadFile, exportPayload, saveFile } from "./export.js";
 import { Remote } from "./remote.js";
 import { fmtDate, fmtNum, t } from "./i18n/index.js";
 import { render, renderDebounced } from "./main.js";
-import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
+import { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent } from "./modals.js";
 import { purgeDemo, seedDemo } from "./seed.js";
 import { toast } from "./ui/feedback.js";
 import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn, resendFromLogin } from "./views/auth.js";
@@ -53,7 +53,8 @@ const ACTIONS = {
   "export-all": () => saveFile("altaris-export-" + today() + ".json", JSON.stringify(exportPayload("all"), null, 2)),
   /* Séances à venir → fichier .ics (rappel 1 h avant), à ouvrir avec l'agenda du téléphone. */
   /* --- séance guidée (src/views/player.js) --- */
-  "play-start": (v) => { startPlayer(v); window.scrollTo(0,0); render(); },
+  "play-start": (v) => withPlan("train", "pl.whyTrain", () => { startPlayer(v); window.scrollTo(0,0); render(); }),
+  plans: () => plansModal(),
   "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
   "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
   "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },
@@ -94,6 +95,14 @@ const ACTIONS = {
   "profile-edit": () => profileEditModal(),
   "acct-edit": (v) => accountEditModal(v),
   "acct-delete": (v) => deleteAccountModal(v),
+  /* Demande de formule : ouvrir le compte ; une fois enregistré, la demande est marquée traitée. */
+  "plan-req": (v) => {
+    const r = (Remote.requests || []).find(x => x.id === v); if (!r) return;
+    accountEditModal(r.user_id, async () => {
+      try{ await Remote.handlePlanRequest(r.id); }catch(e){ return; }
+      Remote.requests = Remote.requests.filter(x => x.id !== r.id);
+    });
+  },
   "acct-toggle": async (v) => {
     const u = Store.get("users", v); if (!u) return;
     if (!await Store.put("users", v, Object.assign({}, u, { status: u.status === "suspended" ? "active" : "suspended" }))) return;
@@ -110,7 +119,7 @@ const ACTIONS = {
   thread: (v) => { View.thread = v; render(); },
   "thread-go": (v) => { View.thread = v; View.tab = "messages"; View.athlete = null; render(); },
   "session-open": (v) => sessionSheet(v),
-  validate: (v) => rpeModal(v),
+  validate: (v) => withPlan("train", "pl.whyTrain", () => rpeModal(v)),
   "block-new": (v, el) => blockEditor(v, el.dataset.d || null, null),
   "avail-edit": () => availModal(),
   "pain-new": () => withHealthConsent(painModal),
@@ -168,9 +177,10 @@ const ACTIONS = {
   },
   "onb-rmslot": (v) => { collectOnb(); View.onb.data.availability.splice(Number(v), 1); render(); },
   /* --- test runner --- */
-  "test-start": () => withHealthConsent(() => {
+  "test-start": () => withPlan("train", "pl.whyTrain", () => withHealthConsent(() => {
     const me = Session.live(), p = me.profile || {};
-    const battery = trackFor(p);
+    /* Essai : bilan de base uniquement ; bilan complet avec une formule payante. */
+    const battery = can(me, "fullTests") ? trackFor(p) : "beginner";
     /* Pre-fill what the profile already knows so the athlete types as little as possible at the wall. */
     const results = {};
     batteryFor(battery).forEach(x => {
@@ -183,7 +193,7 @@ const ACTIONS = {
     });
     View.runner = { userId: me.id, battery, idx: 0, results };
     window.scrollTo(0,0); render();
-  }),
+  })),
   "test-abort": () => { View.runner = null; render(); },
   "test-skip": () => {
     const r = View.runner, test = batteryFor(r.battery)[r.idx];

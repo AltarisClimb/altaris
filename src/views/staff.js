@@ -1,5 +1,5 @@
 import { byId, diffDays, esc, iso, sum, today } from "../core.js";
-import { Access, Session, Store, config } from "../data.js";
+import { Access, Session, Store, config, planOf } from "../data.js";
 import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, fontLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, latestAssessment, limiters } from "../domain/scoring.js";
 import { weekProgress } from "../domain/progress.js";
@@ -187,7 +187,7 @@ function viewAccounts(){
           '<span class="dim tiny">' + esc(u.email || u.id) + '</span></span></span></td>' +
           '<td><span class="chip' + (u.role==="admin"?" acc":"") + '">' + esc(t("role."+u.role)) + '</span></td>' +
           '<td>' + (u.role === "climber" ? esc(coach ? coach.name : t("g.unassigned")) : '<span class="dim">—</span>') + '</td>' +
-          '<td><span class="chip">' + esc(t("ad.plan."+(u.plan||"trial"))) + '</span></td>' +
+          '<td>' + (u.role === "climber" ? '<span class="chip' + (planOf(u) === "premium" ? ' acc' : planOf(u) === "expired" ? ' crit' : '') + '">' + esc(t("plan." + planOf(u))) + '</span>' : '<span class="dim">—</span>') + '</td>' +
           '<td><span class="chip ' + (u.status==="suspended"?"crit":"good") + '">' + esc(u.status==="suspended"?t("ad.suspended"):t("ad.active")) + '</span></td>' +
           '<td class="n noprint"><span class="row tight nowrap" style="justify-content:flex-end">' +
             '<button class="btn xs ghost" data-act="acct-edit" data-v="' + esc(u.id) + '">' + ic("edit") + '</button>' +
@@ -289,6 +289,11 @@ const SEV_ORDER = { crit: 0, msg: 1, warn: 2, info: 3 };
 function inboxItems(me){
   const cfg = config();
   const out = [];
+  /* Admin : demandes de formule en attente (« Nils voudrait Premium »). */
+  if (me.role === "admin") for (const r of Remote.requests || []){
+    const c = Store.get("users", r.user_id);
+    if (c) out.push({ sev: "msg", c, icon: "user", text: t("in.planReq", { plan: t("plan." + r.plan) }), act: "plan-req", v: r.id, btn: t("in.open") });
+  }
   for (const c of Access.climbers()){
     const th = getThread(me.id, c.id);
     const lastRead = (th.read || {})[me.id] || 0;
@@ -329,7 +334,7 @@ function viewInbox(me){
       '<span class="in-ic">' + ic(x.icon) + '</span>' +
       '<span class="in-main"><span class="in-who">' + esc(x.c.name) + '</span>' +
         '<span class="in-what">' + esc(x.text) + '</span></span>' +
-      '<button class="btn sm' + (x.sev === "info" ? ' ghost' : '') + '" data-act="' + x.act + '" data-v="' + esc(x.c.id) + '">' + esc(x.btn) + '</button>' +
+      '<button class="btn sm' + (x.sev === "info" ? ' ghost' : '') + '" data-act="' + x.act + '" data-v="' + esc(x.v || x.c.id) + '">' + esc(x.btn) + '</button>' +
     '</div>';
 
   return '<div class="stack lg">' +

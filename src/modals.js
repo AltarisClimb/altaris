@@ -1,5 +1,6 @@
 import { $, $$, COPYRIGHT, esc, today, uid } from "./core.js";
-import { Access, Session, Store, audit, hasHealthConsent } from "./data.js";
+import { Access, Session, Store, audit, can, hasHealthConsent, planOf } from "./data.js";
+import { FEATURES } from "./domain/plans.js";
 import { Remote } from "./remote.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
@@ -348,7 +349,8 @@ function profileEditModal(){
   });
 }
 
-function accountEditModal(id){
+/** onSaved (optionnel) : appelé après un enregistrement réussi (ex. : demande de formule traitée). */
+function accountEditModal(id, onSaved){
   const u = Store.get("users", id); if (!u) return;
   const coaches = Store.list("users").filter(x => x.role === "coach" || x.role === "admin");
   /* En mode Supabase, l'e-mail appartient à Supabase Auth et il n'y a pas de PIN. */
@@ -362,8 +364,13 @@ function accountEditModal(id){
         '<label class="f"><span class="lb">' + esc(t("ad.role")) + '</span><select class="inp" id="ae-role">' +
           ["climber","coach","admin"].map(r => '<option value="' + r + '"' + (u.role===r?" selected":"") + '>' + esc(t("role."+r)) + '</option>').join("") + '</select></label>' +
         '<label class="f"><span class="lb">' + esc(t("ad.plan")) + '</span><select class="inp" id="ae-plan">' +
-          ["trial","solo","pro","team"].map(r => '<option value="' + r + '"' + ((u.plan||"trial")===r?" selected":"") + '>' + esc(t("ad.plan."+r)) + '</option>').join("") + '</select></label>' +
+          ["trial","standard","premium"].map(r => '<option value="' + r + '"' +
+            ((["standard","premium"].includes(u.plan) ? u.plan : "trial") === r ? " selected" : "") + '>' + esc(t("plan." + r)) + '</option>').join("") +
+          '</select></label>' +
       '</div>' +
+      /* Fin de l'essai : ne compte que pour la formule Essai (pour prolonger un essai, par exemple). */
+      '<label class="f" style="max-width:240px"><span class="lb">' + esc(t("pl.trialEnd")) + '</span>' +
+        '<input class="inp num" type="date" id="ae-trial" value="' + (u.trialEndsAt ? new Date(u.trialEndsAt).toISOString().slice(0, 10) : "") + '"></label>' +
       '<label class="f"><span class="lb">' + esc(t("ad.assignCoach")) + '</span><select class="inp" id="ae-coach">' +
         '<option value="">' + esc(t("g.unassigned")) + '</option>' +
         coaches.map(c => '<option value="' + esc(c.id) + '"' + (u.coachId===c.id?" selected":"") + '>' + esc(c.name) + '</option>').join("") + '</select></label>' +
@@ -382,11 +389,14 @@ function accountEditModal(id){
           email: remote ? u.email : $("#ae-mail", root).value.trim(),
           role: $("#ae-role", root).value,
           plan: $("#ae-plan", root).value,
+          trialEndsAt: $("#ae-plan", root).value !== "trial" ? null
+            : $("#ae-trial", root).value ? Date.parse($("#ae-trial", root).value + "T23:59:59Z") : (u.trialEndsAt || null),
           coachId: $("#ae-coach", root).value || null,
           pin: pin || u.pin
         }));
         if (!ok) return;
         audit("account_updated", u.name);
+        if (onSaved) await onSaved();
         Modal.close(); toast(t("g.saved"), "good");
       };
     }
@@ -440,6 +450,53 @@ function videoCheckModal(){
       });
     }
   });
+}
+
+/* ---------------- formules : comparaison et demande ----------------
+   reason (optionnel) : pourquoi on l'affiche (« la messagerie est réservée au Premium »…). */
+const PLAN_ROWS = [["pl.fTests", "fullTests"], ["pl.fProgram", "programWeeks"], ["pl.fLibrary", "train"],
+                   ["pl.fMessaging", "messaging"], ["pl.fCalls", "calls"]];
+function plansModal(reason){
+  const me = Session.live(); if (!me) return;
+  const cur = planOf(me);
+  const cell = (plan, f) => {
+    const v = FEATURES[plan][f];
+    if (f === "programWeeks") return esc(t("pl.weeks", { n: v }));
+    if (f === "fullTests") return v ? "✓" : esc(t("pl.basicTests"));
+    return v ? "✓" : "—";
+  };
+  Modal.open({
+    title: t("pl.title"), wide: true,
+    body: '<div class="stack">' +
+      (reason ? '<div class="notice acc">' + ic("info") + '<span>' + esc(reason) + '</span></div>' : '') +
+      '<div class="pk-grid">' + ["trial", "standard", "premium"].map(plan =>
+        '<div class="pk' + (plan === cur || (plan === "trial" && cur === "expired") ? ' cur' : '') + (plan === "premium" ? ' best' : '') + '">' +
+          '<div class="pk-h"><b>' + esc(t("plan." + plan)) + '</b><span class="small muted">' + esc(t("plan." + plan + "D")) + '</span></div>' +
+          '<ul>' + PLAN_ROWS.map(([k, f]) => '<li><span>' + esc(t(k)) + '</span><b>' + cell(plan, f) + '</b></li>').join("") + '</ul>' +
+          (plan === cur ? '<span class="chip acc">' + esc(t("pl.current")) + '</span>'
+            : plan === "trial" ? (cur === "expired" ? '<span class="chip crit">' + esc(t("plan.expired")) + '</span>' : '')
+            : '<button class="btn sm' + (plan === "premium" ? ' pri' : '') + '" data-req="' + plan + '">' + esc(t("pl.want")) + '</button>') +
+        '</div>').join("") + '</div>' +
+      '<p class="dim tiny">' + esc(t("pl.howD")) + '</p>' +
+    '</div>',
+    footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>',
+    onMount(root){
+      $("[data-c]", root).onclick = () => Modal.close();
+      $$("[data-req]", root).forEach(b => b.onclick = async () => {
+        b.disabled = true;
+        try{ if (Remote.client) await Remote.requestPlan(b.dataset.req); }
+        catch(e){ b.disabled = false; return toast(t("er.saveFailed"), "crit"); }
+        audit("plan_requested", b.dataset.req);
+        Modal.close(); toast(t("pl.requested", { plan: t("plan." + b.dataset.req) }), "good");
+      });
+    }
+  });
+}
+/** Lance action() si la formule le permet, sinon montre les formules avec la raison. */
+function withPlan(feature, reasonKey, action){
+  const me = Session.live();
+  if (me && can(me, feature)) return action();
+  plansModal(t(reasonKey));
 }
 
 /* ---------------- suppression définitive d'un compte (admin) ----------------
@@ -586,4 +643,4 @@ function withHealthConsent(action){
   healthConsentModal(() => action());
 }
 
-export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };
+export { accountEditModal, availModal, blockEditor, calendarSubscribeModal, deleteAccountModal, healthConsentModal, kudosModal, plansModal, withPlan, legalModal, painModal, profileEditModal, rpeModal, sessionSheet, videoCheckModal, withHealthConsent };

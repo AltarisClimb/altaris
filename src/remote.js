@@ -44,7 +44,9 @@ function fromProfile(p){
     healthConsentAt: p.health_consent_at ? Date.parse(p.health_consent_at) : null,
     timezone: p.timezone || null,
     lang: p.lang || null,
-    lastSeenAt: p.last_seen_at ? Date.parse(p.last_seen_at) : null
+    lastSeenAt: p.last_seen_at ? Date.parse(p.last_seen_at) : null,
+    plan: p.plan || "trial",
+    trialEndsAt: p.trial_ends_at ? Date.parse(p.trial_ends_at) : null
   };
 }
 
@@ -54,6 +56,9 @@ function profilePatch(before, after){
   if (before.name !== after.name) patch.full_name = after.name;
   if (before.role !== after.role) patch.role = ROLE_OUT[after.role];
   if (before.status !== after.status) patch.status = after.status;
+  if (after.plan && before.plan !== after.plan) patch.plan = after.plan;
+  if ((before.trialEndsAt || null) !== (after.trialEndsAt || null))
+    patch.trial_ends_at = after.trialEndsAt ? new Date(after.trialEndsAt).toISOString() : null;
   if ((before.coachId || null) !== (after.coachId || null) || patch.role){
     /* Seuls les élèves ont un coach : le trigger refuse le contraire. */
     patch.teacher_id = after.role === "climber" ? (after.coachId || null) : null;
@@ -115,7 +120,7 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at");
+      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at");
     if (error) throw error;
     return data.map(fromProfile);
   },
@@ -302,6 +307,23 @@ const Remote = {
     try{ tz = Intl.DateTimeFormat().resolvedOptions().timeZone || null; }catch(e){}
     if (!user || (user.timezone === tz && user.lang === lang)) return;
     await this.client.from("profiles").update({ timezone: tz, lang }).eq("id", user.id);
+  },
+
+  /* ---------- formules : demandes de changement ---------- */
+  async requestPlan(plan){
+    const { error } = await this.client.from("plan_requests").insert({ plan });
+    if (error) throw error;
+  },
+  /** Demandes en attente (l'admin les voit toutes, un grimpeur les siennes). */
+  async planRequests(){
+    const { data, error } = await this.client.from("plan_requests")
+      .select("id, user_id, plan, created_at").is("handled_at", null).order("created_at");
+    if (error) throw error;
+    return data;
+  },
+  async handlePlanRequest(id){
+    const { error } = await this.client.from("plan_requests").update({ handled_at: new Date().toISOString() }).eq("id", id);
+    if (error) throw error;
   },
 
   /** Suppression définitive d'un compte (admin uniquement, vérifié par le serveur). */

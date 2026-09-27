@@ -6,7 +6,8 @@
    qui reste à valider et le dernier mot du coach. Les chiffres techniques sont
    dans l'onglet Progrès. */
 import { diffDays, esc, today } from "../core.js";
-import { Access } from "../data.js";
+import { Access, planOf } from "../data.js";
+import { trialDaysLeft } from "../domain/plans.js";
 import { sessionStart } from "../domain/calendar.js";
 import { exById } from "../domain/exercises.js";
 import { focusSession, toValidate, weekProgress, weekStreak } from "../domain/progress.js";
@@ -63,6 +64,7 @@ function viewToday(me){
   }
 
   const isToday = focus && focus.date === today();
+  const plan = planOf(me), daysLeft = trialDaysLeft(me);
   const doneToday = all.some(s => s.date === today() && s.status === "done");
   const hero = focus
     ? '<div class="td-hero" style="--type:' + (TYPE_COLOR[focus.type] || "var(--accent)") + '">' +
@@ -90,7 +92,14 @@ function viewToday(me){
 
   return '<div class="stack lg td">' +
     '<div class="sec-head"><div><h2>' + esc(t("td.hello", { name: (me.name || "").split(" ")[0] })) + '</h2></div></div>' +
-    hero +
+    /* Formule : bandeau pendant l'essai, écran de choix une fois l'essai terminé. */
+    (plan === "trial" ? '<div class="notice acc">' + ic("info") + '<span>' + esc(t("pl.trialLeft", { n: daysLeft })) +
+      ' <button class="link" data-act="plans">' + esc(t("pl.see")) + '</button></span></div>' : '') +
+    (plan === "expired"
+      ? '<div class="td-hero none"><div class="td-hero-main"><span class="eyebrow">' + esc(t("plan.expired")) + '</span>' +
+          '<div class="td-title">' + esc(t("pl.expiredT")) + '</div><p class="muted small">' + esc(t("pl.expiredD")) + '</p></div>' +
+          '<div class="td-cta"><button class="btn pri td-go" data-act="plans">' + esc(t("pl.choose")) + '</button></div></div>'
+      : hero) +
 
     (late.length ? '<div class="panel in-list">' + late.map(s =>
       '<div class="in-row warn"><span class="in-ic">' + ic("check") + '</span>' +

@@ -33,6 +33,9 @@ update profiles set role = 'admin'   where id = :A;
 update profiles set role = 'teacher' where id in (:T1, :T2);
 update profiles set teacher_id = :T1 where id = :S1;
 update profiles set teacher_id = :T2 where id = :S2;
+-- Plans: S1 is an expired trial (free + assigned exercises only), S2 is premium (messaging).
+update profiles set plan = 'trial', trial_ends_at = now() - interval '1 day' where id = :S1;
+update profiles set plan = 'premium' where id = :S2;
 update exercises set visibility = 'free' where slug = 'fd03';
 
 -- ================= student S1
@@ -237,6 +240,52 @@ select t.ok('S2 conversation is gone', (select count(*) from messages where athl
 select t.ok('S2 devices are gone', (select count(*) from push_subscriptions where user_id = :S2) = 0);
 select t.err('anon cannot delete accounts', 'set role anon; select public.admin_delete_user(' || quote_literal(:S1) || ')');
 reset role;
+
+-- ================= plans
+insert into auth.users (id, email, raw_user_meta_data) values
+  ('00000000-0000-0000-0000-0000000000e1', 'trial@x', '{}'),
+  ('00000000-0000-0000-0000-0000000000e2', 'std@x', '{}');
+select t.ok('a new sign-up starts a 7-day trial',
+  (select plan = 'trial' and trial_ends_at > now() + interval '6 days' from profiles where email = 'trial@x'));
+select t.as(null);
+update profiles set plan = 'standard', trial_ends_at = null where email = 'std@x';
+
+select t.as('00000000-0000-0000-0000-0000000000e1'); set role authenticated;
+select t.err('a climber cannot upgrade themselves', 'update profiles set plan = ''premium'' where email = ''trial@x''');
+select t.err('a climber cannot extend their trial', 'update profiles set trial_ends_at = now() + interval ''1 year'' where email = ''trial@x''');
+select t.ok('trial: sees the library', (select count(*) from exercises) > 100);
+update profiles set health_consent_at = now() where email = 'trial@x';
+select t.ok('trial: basic test saved', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''assessments'', ''a-t1'', ''00000000-0000-0000-0000-0000000000e1'', ''{"battery":"beginner"}'')') = 1);
+select t.err('trial: full test refused', 'insert into athlete_docs (col, id, athlete_id, data) values (''assessments'', ''a-t2'', ''00000000-0000-0000-0000-0000000000e1'', ''{"battery":"advanced"}'')');
+select t.ok('trial: session within the trial week', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-t1'', ''00000000-0000-0000-0000-0000000000e1'', ' || quote_literal(json_build_object('date', current_date + 3)::text) || ')') = 1);
+select t.err('trial: no session after the trial', 'insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-t2'', ''00000000-0000-0000-0000-0000000000e1'', ' || quote_literal(json_build_object('date', current_date + 20)::text) || ')');
+select t.err('trial: no messaging', 'insert into messages (athlete_id, body) values (''00000000-0000-0000-0000-0000000000e1'', ''hi'')');
+select t.ok('trial: can ask for a plan', t.rows('insert into plan_requests (plan) values (''premium'')') = 1);
+select t.err('trial: cannot ask on behalf of someone else', 'insert into plan_requests (user_id, plan) values (''00000000-0000-0000-0000-0000000000e2'', ''premium'')');
+reset role;
+
+select t.as('00000000-0000-0000-0000-0000000000e2'); set role authenticated;
+select t.ok('standard: session far ahead allowed', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''sessions'', ''s-s1'', ''00000000-0000-0000-0000-0000000000e2'', ' || quote_literal(json_build_object('date', current_date + 25)::text) || ')') = 1);
+select t.err('standard: no messaging', 'insert into messages (athlete_id, body) values (''00000000-0000-0000-0000-0000000000e2'', ''hi'')');
+select t.ok('standard: does not see other requests', (select count(*) from plan_requests) = 0);
+reset role;
+
+-- The trial ends.
+select t.as(null);
+update profiles set trial_ends_at = now() - interval '1 minute' where email = 'trial@x';
+select t.as('00000000-0000-0000-0000-0000000000e1'); set role authenticated;
+select t.ok('expired: effective plan', public.plan_of('00000000-0000-0000-0000-0000000000e1') = 'expired');
+select t.err('expired: cannot validate a session', 'update athlete_docs set data = data || ''{"status":"done"}'' where id = ''s-t1''');
+select t.ok('expired: can still report pain', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''pain'', ''p-t1'', ''00000000-0000-0000-0000-0000000000e1'', ''{"eva":2}'')') = 1);
+select t.ok('expired: back to free + assigned exercises', (select count(*) from exercises) < 5);
+reset role;
+
+select t.as(:A); set role authenticated;
+select t.ok('admin sees plan requests', (select count(*) from plan_requests) = 1);
+select t.ok('admin upgrades the climber', t.rows('update profiles set plan = ''premium'', trial_ends_at = null where email = ''trial@x''') = 1);
+select t.ok('admin marks the request handled', t.rows('update plan_requests set handled_at = now()') = 1);
+reset role;
+select t.ok('upgraded: plan is premium again', public.plan_of('00000000-0000-0000-0000-0000000000e1') = 'premium');
 
 -- ================= anon
 select t.as(null); set role anon;

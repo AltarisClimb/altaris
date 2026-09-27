@@ -1,7 +1,8 @@
 import { $, $$, addDays, byId, esc, uid } from "../core.js";
-import { Access, Session, Store, audit, config } from "../data.js";
+import { Access, Session, Store, audit, can, config, planOf } from "../data.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
 import { fontLabel, trackFor } from "../domain/grades.js";
+import { trialDaysLeft } from "../domain/plans.js";
 import { latestAssessment } from "../domain/scoring.js";
 import { LI, LOC, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
 import { body, render } from "../main.js";
@@ -211,6 +212,8 @@ async function markRead(th, userId){
 }
 
 function viewMessages(me){
+  /* Messagerie avec le coach : réservée au Premium (le serveur l'impose aussi). */
+  if (me.role === "climber" && !can(me, "messaging")) return lockedView("pl.lockMsgT", "pl.lockMsgD", "chat");
   const partners = me.role === "climber"
     ? (Access.myCoach() ? [Access.myCoach()] : [])
     : Access.climbers();
@@ -326,6 +329,16 @@ function viewProfile(me){
       '<p style="font-family:var(--serif);font-size:19px;line-height:1.4">' + esc(p.goalText) + '</p>' +
       (p.goalDate ? '<span class="chip acc">' + esc(fmtDateLong(p.goalDate)) + '</span>' : '') + '</div>' : '') +
 
+    /* Formule du grimpeur (mode Supabase) : laquelle, jusqu'à quand pour l'essai, et la comparaison. */
+    (me.role === "climber" && Remote.client ? (() => {
+      const plan = planOf(me), left = trialDaysLeft(me);
+      return '<div class="panel pad stack sm"><div class="between"><span class="eyebrow">' + esc(t("pl.mine")) + '</span>' +
+        '<span class="chip ' + (plan === "premium" ? "acc" : plan === "expired" ? "crit" : "") + '">' + esc(t("plan." + plan)) + '</span></div>' +
+        '<p class="small muted">' + esc(plan === "trial" ? t("pl.trialLeft", { n: left }) : plan === "expired" ? t("pl.expiredD") : t("plan." + plan + "D")) + '</p>' +
+        '<div class="row tight noprint"><button class="btn sm' + (plan === "premium" ? ' ghost' : ' pri') + '" data-act="plans">' + esc(t("pl.see")) + '</button></div>' +
+      '</div>';
+    })() : '') +
+
     notifSection() +
 
     /* Consentement santé (RGPD art. 9) : état, et le donner ou le retirer à tout moment. */
@@ -362,4 +375,13 @@ function rw(k, v){
     '<span class="v">' + esc(v) + '</span></div>';
 }
 
-export { exerciseModal, getThread, markRead, rw, sendMessage, threadId, unreadCount, viewExercises, viewMessages, viewProfile };
+export { exerciseModal, getThread, lockedView, markRead, rw, sendMessage, threadId, unreadCount, viewExercises, viewMessages, viewProfile };
+
+/** Écran d'une fonction non incluse dans la formule, avec l'accès à la comparaison. */
+function lockedView(titleKey, textKey, icon){
+  return '<div class="stack lg"><div class="panel"><div class="empty">' + ic(icon || "lock") +
+    '<div class="t">' + esc(t(titleKey)) + '</div>' +
+    '<div class="d">' + esc(t(textKey)) + '</div>' +
+    '<button class="btn pri" style="margin-top:14px" data-act="plans">' + esc(t("pl.see")) + '</button>' +
+  '</div></div></div>';
+}

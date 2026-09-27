@@ -623,3 +623,17 @@ main > *{animation:fade-up .22s ease both}
 .av-wrap .pr-dot{position:absolute; right:-1px; bottom:-1px; margin:0; width:12px; height:12px; box-shadow:0 0 0 2px var(--surface)}
 .av-wrap .pr-dot:not(.on){display:none}
 .pr-on{color:var(--good); font-weight:600}
+
+/* ---------- formules ---------- */
+.pk-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px}
+.pk{display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:var(--r-lg); background:var(--surface-2);
+  border:1px solid var(--line-soft)}
+.pk.best{border-color:var(--accent-line)}
+.pk.cur{box-shadow:inset 0 0 0 2px var(--accent)}
+.pk-h{display:flex; flex-direction:column; gap:3px}
+.pk-h b{font-family:var(--serif); font-size:20px}
+.pk ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; flex:1 1 auto}
+.pk li{display:flex; justify-content:space-between; gap:8px; font-size:12.5px; border-bottom:1px dashed var(--line-soft); padding-bottom:5px}
+.pk li b{color:var(--ink); white-space:nowrap}
+.btn.link, button.link{background:none; border:0; padding:0; color:var(--accent); font-weight:600; text-decoration:underline; cursor:pointer}
+@media (max-width:640px){ .pk-grid{grid-template-columns:1fr} }
