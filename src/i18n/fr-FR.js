@@ -120,6 +120,7 @@ export default {
   "auth.checkSpam": "Rien reçu ? Regardez dans les courriers indésirables : l'e-mail peut mettre quelques minutes à arriver. Sinon, renvoyez-le.",
   "auth.emailConfirmed": "Adresse confirmée. Bienvenue !",
   "auth.linkExpired": "Ce lien a expiré ou a déjà servi. Connectez-vous, ou demandez un nouveau lien.",
+  "auth.linkExpiredD": "Ce lien de confirmation a expiré ou a déjà servi (seul le dernier e-mail reçu est valable). Saisissez votre e-mail ci-dessus et demandez un nouveau lien.",
   "auth.remoteRoleD": "Tout nouveau compte est grimpeur. Un administrateur attribue ensuite les rôles coach ou administrateur.",
   "auth.remoteDown": "Serveur de comptes injoignable. Vérifiez la connexion.",
   "auth.securityRemoteD": "Les comptes et les droits d'accès sont vérifiés par le serveur. Séances et messages sont partagés avec votre coach ; vos tests et votre journal de douleur aussi, si vous donnez votre accord.",

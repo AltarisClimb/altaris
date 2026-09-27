@@ -88,6 +88,14 @@ const Remote = {
    *  sur le site, pas sur supabase.co. Renvoie "confirmed", "recovery",
    *  "expired" ou null s'il n'y a pas de lien dans l'adresse. */
   async consumeEmailLink(){
+    /* Lien refusé par Supabase (expiré, déjà utilisé) : il revient avec #error=…&error_code=…
+       On nettoie l'adresse et on le signale à l'écran de connexion. */
+    const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+    if (h.get("error_code") || h.get("error")){
+      this.linkError = h.get("error_code") || h.get("error");
+      history.replaceState(null, "", location.pathname + location.search);
+      return "expired";
+    }
     const q = new URLSearchParams(location.search);
     const token_hash = q.get("token_hash"), type = q.get("type");
     if (!token_hash || !type) return null;

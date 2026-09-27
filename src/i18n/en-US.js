@@ -120,6 +120,7 @@ export default {
   "auth.checkSpam": "Nothing yet? Check your spam folder: the email can take a few minutes. Otherwise, send it again.",
   "auth.emailConfirmed": "Email confirmed. Welcome!",
   "auth.linkExpired": "This link has expired or was already used. Sign in, or request a new link.",
+  "auth.linkExpiredD": "This confirmation link has expired or was already used (only the latest email is valid). Enter your email above and ask for a new link.",
   "auth.remoteRoleD": "Every new account starts as a climber. An administrator then assigns coach or administrator roles.",
   "auth.remoteDown": "Account server unreachable. Check your connection.",
   "auth.securityRemoteD": "Accounts and access rights are checked by the server. Sessions and messages are shared with your coach; your tests and pain log too, if you consent.",

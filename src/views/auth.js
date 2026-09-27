@@ -29,8 +29,11 @@ function viewAuthRemote(){
         '<input class="inp" id="li-mail" data-fk="li-mail" type="email" autocomplete="username" required></label>' +
       '<label class="f"><span class="lb">' + esc(t("auth.password")) + '</span>' +
         pwField("li-pass", ' data-fk="li-pass" type="password" autocomplete="current-password" required') + '</label>' +
+      /* Arrivée par un lien expiré ou déjà utilisé : l'expliquer et proposer un nouveau lien. */
+      (Remote.linkError ? '<div class="notice warn">' + ic("alert") + '<span>' + esc(t("auth.linkExpiredD")) + '</span></div>' : '') +
       '<div id="li-err" class="notice crit" style="display:none">' + ic("alert") + '<span></span></div>' +
-      '<button class="btn sm" type="button" id="li-resend" data-act="resend-confirm" style="display:none">' + ic("send") + esc(t("auth.resend")) + '</button>' +
+      '<button class="btn sm" type="button" id="li-resend" data-act="resend-confirm"' + (Remote.linkError ? '' : ' style="display:none"') + '>' +
+        ic("send") + esc(t("auth.resend")) + '</button>' +
       '<button class="btn pri wide" type="submit">' + esc(t("auth.signIn")) + '</button>' +
       '<button class="btn ghost sm" type="button" data-act="remote-forgot">' + esc(t("auth.forgot")) + '</button>' +
     '</form>' +
