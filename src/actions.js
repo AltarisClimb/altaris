@@ -16,6 +16,8 @@ import { bookModal, callIcs, cancelCall, closeTimer, coachCallsModal, coachJoin,
 import { calDate, calMode, shiftDate } from "./views/calendar.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
+import { closeHang, hangActions, hangSets, openHang } from "./views/hang.js";
+import { freeSessionModal, gearModal, goalModal } from "./views/training.js";
 import { sessionsOf } from "./views/climber.js";
 import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
@@ -70,7 +72,41 @@ const ACTIONS = {
   "play-next": () => { playerActions.next(); window.scrollTo(0,0); render(); },
   "play-skip": () => { playerActions.skip(); window.scrollTo(0,0); render(); },
   "play-prev": () => { playerActions.prev(); window.scrollTo(0,0); render(); },
-  "play-set": (v) => { playerActions.set(Number(v)); render(); },
+  /* Journal des séries (charge, réglette, effort) */
+  "play-log": () => { playerActions.logSet(); render(); },
+  "play-unlog": () => { playerActions.unlog(); render(); },
+  "play-load": (v) => { playerActions.load(Number(v)); render(); },
+  "play-edge": (v) => { playerActions.edge(v); render(); },
+  "play-effort": (v) => { playerActions.effort(v); render(); },
+  "play-warmup": async () => { await playerActions.addWarmup(); window.scrollTo(0,0); render(); },
+  /* --- minuteur de suspension (src/views/hang.js) --- */
+  "hang-open": (v) => {
+    const p = View.player, c = p && v ? p.cur[v] : null;
+    openHang(Object.assign({ exId: v || null, fromPlayer: !!(p && v) }, c ? { load: c.load, edge: c.edge } : {}));
+    window.scrollTo(0,0); render();
+  },
+  "hang-proto": (v) => { hangActions.proto(v); render(); },
+  "hang-adj": (v) => { hangActions.adj(v); render(); },
+  "hang-load": (v) => { hangActions.load(v); render(); },
+  "hang-edge": (v) => { hangActions.edge(v); render(); },
+  "hang-voice": () => { hangActions.voice(); render(); },
+  "hang-start": () => { hangActions.start(); render(); },
+  "hang-pause": () => { hangActions.pause(); render(); },
+  "hang-skip": () => { hangActions.skip(); },
+  "hang-fail": () => { hangActions.fail(); },
+  "hang-stop": () => { hangActions.stop(); render(); },
+  "hang-effort": (v) => { hangActions.effort(v); render(); },
+  "hang-again": () => { Object.assign(View.hang, { started: false, done: false }); render(); },
+  "hang-save": () => {
+    const h = View.hang;
+    if (h && h.fromPlayer && h.exId){ playerActions.addSets(h.exId, hangSets(h)); toast(t("hg.saved"), "good"); }
+    closeHang(); render();
+  },
+  "hang-close": () => {
+    const h = View.hang;
+    if (h && h.started && !h.done && !confirm(t("hg.quitConfirm"))) return;
+    closeHang(); render();
+  },
   "play-preset": (v) => { playerActions.preset(Number(v)); render(); },
   "play-toggle": () => { playerActions.toggle(); render(); },
   "play-rpe": (v) => { playerActions.rpe(Number(v)); render(); },
@@ -78,8 +114,18 @@ const ACTIONS = {
   "play-close": () => {
     const p = View.player;
     if (p && !p.finished && Date.now() - p.startedAt > 60000 && !confirm(t("pl.quitConfirm"))) return;
+    /* Séance libre abandonnée : elle n'a pas lieu d'encombrer le calendrier. */
+    const s = p && Store.get("sessions", p.id);
+    if (s && s.adhoc && s.status !== "done") Store.del("sessions", s.id);
     stopPlayer(); View.tab = "today"; window.scrollTo(0,0); render();
   },
+  "goal-edit": () => goalModal(),
+  "gear-edit": () => gearModal(),
+  /* Séance libre : minuteur de suspension, échauffement express, modèles. */
+  "free-session": () => withPlan("train", "pl.whyTrain", () => freeSessionModal((o) => {
+    if (o.hang) openHang({}); else startPlayer(o.sessionId);
+    window.scrollTo(0,0); render();
+  })),
   "play-message": () => { stopPlayer(); View.tab = "messages"; render(); },
   "cal-subscribe": () => calendarSubscribeModal(),
   kudos: (v) => kudosModal(v),

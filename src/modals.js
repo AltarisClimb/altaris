@@ -1,12 +1,16 @@
 import { $, $$, COPYRIGHT, addDays, esc, today, uid } from "./core.js";
-import { Access, Session, Store, audit, can, hasHealthConsent, planOf } from "./data.js";
+import { Access, Session, Store, audit, can, config, hasHealthConsent, planOf } from "./data.js";
 import { FEATURES } from "./domain/plans.js";
 import { Remote } from "./remote.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
 import { FONT, SPORT, fontLabel, trackFor } from "./domain/grades.js";
 import { generateProgram } from "./domain/program.js";
-import { limiters } from "./domain/scoring.js";
+import { latestAssessment } from "./domain/scoring.js";
+import { focusDomains } from "./domain/benchmarks.js";
+import { goalOf } from "./domain/periodization.js";
+import { retestStatus } from "./domain/progress.js";
+import { assessmentsOf } from "./domain/scoring.js";
 import { sessionLoad } from "./domain/workload.js";
 import { LANG, LI, fmtDateLong, fmtNum, t } from "./i18n/index.js";
 import { body, render } from "./main.js";
@@ -16,6 +20,7 @@ import { ic } from "./ui/icons.js";
 import { PAIN_SITES, kpi, painLabel } from "./views/climber.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { DAYS, SESSION_TYPES, fNum, fSelect } from "./views/onboarding.js";
+import { saveTemplate, sessionLog } from "./views/training.js";
 /* ================================================================
    20. MODALS — session sheet, RPE validation, block editor,
        pain report, availability, profile, account, legal
@@ -47,15 +52,18 @@ function sessionSheet(id){
         kpi(t("rpe.realDur"), String(s.actualMin), t("g.min"), "") +
         kpi(t("ld.session"), fmtNum(s.load), t("ld.au"), t("ld.formula")) + '</div>' +
         (s.feedback ? '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.feedback")) + '</span>' +
-          '<p class="small muted" style="line-height:1.6;white-space:pre-wrap">' + esc(s.feedback) + '</p></div>' : '') : '') +
+          '<p class="small muted" style="line-height:1.6;white-space:pre-wrap">' + esc(s.feedback) + '</p></div>' : '') +
+        sessionLog(s) : '') +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>' +
+      ((s.exercises || []).length && (isCoach || s.userId === me.id) ? '<button class="btn ghost" data-tpl>' + esc(t("tp.save")) + '</button>' : '') +
       (isCoach ? '<button class="btn" data-edit>' + ic("edit") + esc(t("g.edit")) + '</button>' : '') +
       (s.status !== "done" && !isCoach ? '<button class="btn pri" data-val>' + ic("check") + esc(t("ov.validate")) + '</button>' : '') +
       (s.status === "planned" && isCoach ? '<button class="btn danger" data-miss>' + esc(t("cal.markMissed")) + '</button>' : ''),
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       $$("[data-ex]", root).forEach(b => b.onclick = () => exerciseModal(b.dataset.ex));
+      const tp = $("[data-tpl]", root); if (tp) tp.onclick = async () => { tp.disabled = true; await saveTemplate(s.id); };
       const e = $("[data-edit]", root); if (e) e.onclick = () => { Modal.close(); blockEditor(s.userId, s.date, s.id); };
       const v = $("[data-val]", root); if (v) v.onclick = () => { Modal.close(); rpeModal(s.id); };
       const m = $("[data-miss]", root); if (m) m.onclick = async () => {
@@ -463,7 +471,9 @@ function programModal(){
   const p = me.profile || {};
   const weeks = FEATURES[planOf(me)].programWeeks;
   if (!weeks) return plansModal(t("pl.whyTrain"));
-  const lim = limiters(me.id), weak = lim ? [lim.weak[0]] : [];
+  const weak = focusDomains(latestAssessment(me.id), p);
+  const goal = goalOf(p);
+  const rs = retestStatus(assessmentsOf(me.id), config().retestDays);
   const from = addDays(today(), 1);
   const mine = Store.list("sessions").filter(s => s.userId === me.id);
   const oldProgram = mine.filter(s => s.program && s.status === "planned" && s.date >= from);
@@ -471,15 +481,19 @@ function programModal(){
   const programId = uid("pg");
   const list = generateProgram({
     userId: me.id, profile: p, track: trackFor(p), exercises: EXERCISES, weak, weeks, from, taken, programId,
+    gear: p.gear, phases: goal ? goal.phases : null, retestOn: rs.first ? null : rs.next,
     until: planOf(me) === "trial" && me.trialEndsAt ? new Date(me.trialEndsAt).toISOString().slice(0, 10) : null,
-    label: (theme, w) => t("prg." + theme) + (weeks > 1 ? " · " + t("prg.week", { n: w }) : "")
+    label: (theme, w) => theme === "retest" ? t("rt.session") : t("prg." + theme) + (weeks > 1 ? " · " + t("prg.week", { n: w }) : "")
   });
   const week1 = list.filter(s => s.program.week === 1);
   Modal.open({
     title: oldProgram.length ? t("prg.renew") : t("prg.create"), wide: true,
     body: '<div class="stack">' +
       '<p style="line-height:1.6">' + esc(t("prg.intro", { weeks, n: week1.length })) +
-        (weak.length ? ' ' + esc(t("prg.focus", { q: t("d." + weak[0]) })) : '') + '</p>' +
+        (weak.length ? ' ' + esc(t("prg.focus", { q: weak.map(d => t("d." + d)).join(" + ") })) : '') + '</p>' +
+      (goal ? '<div class="notice acc">' + ic("target") + '<span>' + esc(t("prg.goal", { text: goal.text || t("gl.noText"), n: goal.days,
+        p: t("ph." + (goal.phase || "base")) })) + '</span></div>' : '') +
+      (list.some(s => s.retest) ? '<div class="notice">' + ic("test") + '<span>' + esc(t("prg.retest")) + '</span></div>' : '') +
       (oldProgram.length ? '<div class="notice warn">' + ic("info") + '<span>' + esc(t("prg.replaces", { n: oldProgram.length })) + '</span></div>' : '') +
       (list.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("prg.week", { n: 1 })) + '</span>' +
         '<div class="panel in-list">' + week1.map(s =>

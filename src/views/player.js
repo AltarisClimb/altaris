@@ -1,13 +1,19 @@
 /* ALTARIS™ — séance guidée, plein écran
    © 2026 ALTARIS™. All rights reserved.
 
-   Un exercice à la fois : illustration, dosage, consignes, compteur de séries et
-   minuteur (bip + vibration). À la fin, l'effort ressenti en un geste, puis une
-   carte « Bravo ». L'état vit dans View.player ; le minuteur et le chrono sont
-   repeints sans re-rendu complet (bindPlayer). */
+   Un exercice à la fois : illustration, dosage, consignes, journal des séries
+   (charge, réglette, effort — avec la charge conseillée d'après la dernière
+   fois), minuteur de repos et, pour la poutre, le minuteur de suspension
+   (hang.js). À la fin, l'effort ressenti en un geste, puis une carte « Bravo ».
+   L'état vit dans View.player ; le minuteur et le chrono sont repeints sans
+   re-rendu complet (bindPlayer). */
 import { $, esc } from "../core.js";
 import { Session, Store, audit } from "../data.js";
-import { exById, exField, exName } from "../domain/exercises.js";
+import { EXERCISES, exById, exField, exName } from "../domain/exercises.js";
+import { EDGES, edgeInText, nearestEdge } from "../domain/gear.js";
+import { parseDose } from "../domain/hang.js";
+import { SET_EFFORT, exerciseHistory, fmtLoad, suggestNext } from "../domain/loads.js";
+import { buildWarmup, hasWarmup } from "../domain/warmup.js";
 import { weekProgress, weekStreak } from "../domain/progress.js";
 import { sessionLoad } from "../domain/workload.js";
 import { fmtNum, t } from "../i18n/index.js";
@@ -26,7 +32,7 @@ let wakeLock = null;      // écran allumé pendant la séance
 /* ---------- état ---------- */
 function startPlayer(sessionId){
   const s = Store.get("sessions", sessionId); if (!s) return;
-  View.player = { id: s.id, idx: 0, startedAt: Date.now(), sets: {}, done: [], rpe: 0,
+  View.player = { id: s.id, idx: 0, startedAt: Date.now(), log: {}, cur: {}, done: [], rpe: 0,
                   timer: { dur: 30, left: 30, endAt: null }, finished: null };
   keepAwake(true);
 }
@@ -48,6 +54,25 @@ function steps(s){
   return list.length ? list : [null];
 }
 
+/* Catégories où l'on note une charge ; ailleurs, la série est simplement comptée. */
+const LOAD_CATS = ["doigts", "tirage", "poussee", "gainage", "antagonistes", "pliometrie"];
+const takesLoad = (e) => !!e && LOAD_CATS.includes(e.cat);
+/** Exercice de suspension : le minuteur dédié est proposé. */
+const isHang = (e) => !!e && (e.cat === "doigts" || /^hang/.test(((e.meta || {}).pose || {}).pose || "")) && !!parseDose(exField(e, "dose"));
+const loadStep = (e) => (e && e.cat === "doigts" ? 1 : 2.5);
+
+/** Ce que l'on s'apprête à noter pour cet exercice : pré-rempli avec la charge conseillée. */
+function current(p, e, userId){
+  if (!e) return null;
+  if (!p.cur[e.id]){
+    const sug = takesLoad(e) ? suggestNext(exerciseHistory(sessionsOf(userId), e.id), e.cat === "doigts" ? 2 : 2.5) : null;
+    const me = Session.live(), gear = ((me && me.profile) || {}).gear || {};
+    const target = edgeInText(exField(e, "dose")) || 20;
+    p.cur[e.id] = { load: sug ? sug.load : 0, edge: (sug && sug.edge) || nearestEdge(gear.edges, target) || target, effort: "ok" };
+  }
+  return p.cur[e.id];
+}
+
 function timerLeft(tm){ return tm.endAt ? Math.max(0, (tm.endAt - Date.now()) / 1000) : tm.left; }
 function fmtClock(sec){
   const s = Math.ceil(sec);
@@ -61,8 +86,29 @@ const playerActions = {
           if (st && !p.done.includes(st.id)) p.done.push(st.id); p.idx++; resetTimer(p); },
   skip(){ const p = View.player; p.idx++; resetTimer(p); },
   prev(){ const p = View.player; p.idx = Math.max(0, p.idx - 1); resetTimer(p); },
-  set(delta){ const p = View.player, st = steps(Store.get("sessions", p.id))[p.idx], k = st ? st.id : "_";
-              p.sets[k] = Math.max(0, (p.sets[k] || 0) + delta); },
+  /** Série faite : noter charge, réglette et effort ; « − » retire la dernière. */
+  logSet(){
+    const p = View.player, s = Store.get("sessions", p.id), e = steps(s)[p.idx], k = e ? e.id : "_";
+    const c = current(p, e, s.userId), eff = SET_EFFORT.find(x => x[0] === (c ? c.effort : "ok"));
+    const set = !c ? {} : Object.assign({ rpe: eff[1] }, takesLoad(e) ? { load: c.load } : {},
+      e.cat === "doigts" ? { edge: c.edge } : {}, c.effort === "max" ? { failed: true } : {});
+    (p.log[k] = p.log[k] || []).push(set);
+  },
+  unlog(){ const p = View.player, e = steps(Store.get("sessions", p.id))[p.idx], k = e ? e.id : "_"; (p.log[k] || []).pop(); },
+  load(d){ const p = View.player, s = Store.get("sessions", p.id), e = steps(s)[p.idx], c = current(p, e, s.userId);
+           if (c) c.load = Math.round((c.load + Number(d) * loadStep(e)) * 2) / 2; },
+  edge(mm){ const p = View.player, s = Store.get("sessions", p.id), c = current(p, steps(s)[p.idx], s.userId); if (c) c.edge = Number(mm); },
+  effort(k){ const p = View.player, s = Store.get("sessions", p.id), c = current(p, steps(s)[p.idx], s.userId); if (c) c.effort = k; },
+  /** Bilan du minuteur de suspension → séries de l'exercice en cours. */
+  addSets(exId, sets){ const p = View.player; if (!p || !sets.length) return; (p.log[exId] = p.log[exId] || []).push(...sets); },
+  /** Pas d'échauffement prévu : l'ajouter en tête de séance. */
+  async addWarmup(){
+    const p = View.player, s = Store.get("sessions", p.id), me = Session.live();
+    const ids = buildWarmup(s, EXERCISES, ((me && me.profile) || {}).gear, Math.floor(p.startedAt / 1000));
+    if (!ids.length) return;
+    await Store.put("sessions", s.id, Object.assign({}, s, { exercises: ids.concat(s.exercises || []), plannedMin: (s.plannedMin || 0) + 12 }));
+    p.idx = 0;
+  },
   preset(sec){ const tm = View.player.timer; tm.dur = sec; tm.left = sec; tm.endAt = null; },
   toggle(){ const tm = View.player.timer;
             if (tm.endAt){ tm.left = timerLeft(tm); tm.endAt = null; }
@@ -74,10 +120,12 @@ const playerActions = {
     const earnedBefore = new Set(badgesOf(s.userId).filter(b => b.earned).map(b => b.id));
     const min = Number(p.durInput) || elapsedMin(p);
     const done = p.done.length ? p.done : (s.exercises || []);
+    const log = {};
+    Object.entries(p.log).forEach(([k, v]) => { if (k !== "_" && v.length) log[k] = v; });
     await Store.put("sessions", s.id, Object.assign({}, s, {
       status: "done", rpe: p.rpe, actualMin: min, load: sessionLoad(p.rpe, min),
       feedback: (p.fb || "").trim(), doneExercises: done, doneAt: Date.now(), guided: true
-    }));
+    }, Object.keys(log).length ? { log } : {}));
     audit("session_validated", s.id + " RPE" + p.rpe + " " + min + "min (guided)");
     const me = Session.live(), all = sessionsOf(me.id);
     p.finished = { min, load: sessionLoad(p.rpe, min), done: done.length, total: (s.exercises || []).length,
@@ -136,21 +184,23 @@ function viewPlayer(){
       '<button class="btn pri" data-act="play-finish"' + (p.rpe ? '' : ' disabled') + '>' + ic("check") + esc(t("pl.finish")) + '</button></div>' +
   '</div></div>';
 
-  const e = list[p.idx], key = e ? e.id : "_", sets = p.sets[key] || 0, tm = p.timer;
+  const e = list[p.idx], key = e ? e.id : "_", sets = p.log[key] || [], tm = p.timer;
   const fig = e && exercisePose(e.meta);
+  const me = Session.live();
+  const warm = p.idx === 0 && !hasWarmup(s, EXERCISES) ? buildWarmup(s, EXERCISES, ((me && me.profile) || {}).gear, 0) : [];
   return '<div class="pl">' + head + '<div class="pl-body stack">' +
     '<div class="small muted">' + esc(t("pl.step", { i: p.idx + 1, n })) + '</div>' +
+    (warm.length ? '<div class="notice acc">' + ic("info") + '<span>' + esc(t("wu.missing", { n: warm.length })) +
+      ' <button class="link" data-act="play-warmup">' + esc(t("wu.add")) + '</button></span></div>' : '') +
     (fig ? '<div class="pl-fig">' + fig + '</div>' : '') +
     '<h2 class="pl-h">' + esc(e ? exName(e) : s.title) + '</h2>' +
     (e && exField(e, "dose") ? '<div class="pl-dose">' + esc(exField(e, "dose")) + '</div>' : '') +
     (e && exField(e, "c") ? '<p class="small muted" style="line-height:1.55">' + esc(exField(e, "c")) + '</p>' : '') +
     (!e && s.notes ? '<p style="line-height:1.6">' + esc(s.notes) + '</p>' : '') +
 
-    '<div class="pl-tools">' +
-      '<div class="panel pl-sets"><span class="eyebrow">' + esc(t("pl.sets")) + '</span>' +
-        '<div class="pl-sets-row"><button class="btn icon" data-act="play-set" data-v="-1" aria-label="-1">−</button>' +
-          '<span class="pl-sets-n">' + sets + '</span>' +
-          '<button class="btn icon pri" data-act="play-set" data-v="1" aria-label="+1">+</button></div></div>' +
+    (e ? setLogger(p, e, s, sets) : '') +
+    (isHang(e) ? '<button class="btn pri hg-open" data-act="hang-open" data-v="' + esc(e.id) + '">' + ic("timer") + esc(t("hg.open")) + '</button>' : '') +
+    '<div class="pl-tools one">' +
       '<div class="panel pl-timer"><span class="eyebrow">' + esc(t("pl.timer")) + '</span>' +
         '<button class="pl-time' + (tm.endAt ? ' run' : '') + '" id="pl-time" data-act="play-toggle">' + fmtClock(timerLeft(tm)) + '</button>' +
         '<div class="pl-presets">' + PRESETS.map(sec =>
@@ -163,6 +213,34 @@ function viewPlayer(){
       '<button class="btn pri" data-act="play-next">' + ic("check") + esc(p.idx + 1 < n ? t("pl.next") : t("pl.last")) + '</button>' +
     '</div>' +
   '</div></div>';
+}
+
+/** Journal des séries de l'exercice : charge conseillée, réglages, séries notées. */
+function setLogger(p, e, s, sets){
+  const c = current(p, e, s.userId), load = takesLoad(e);
+  const hist = load ? exerciseHistory(sessionsOf(s.userId), e.id) : [];
+  const sug = load ? suggestNext(hist, e.cat === "doigts" ? 2 : 2.5) : null;
+  const me = Session.live(), gear = ((me && me.profile) || {}).gear || {};
+  const edges = (gear.edges || []).length ? gear.edges : EDGES.filter(n => n >= 10 && n <= 30);
+  return '<div class="panel pl-log stack sm">' +
+    '<div class="between"><span class="eyebrow">' + esc(t("pl.sets")) + '</span><span class="small muted">' + sets.length + '</span></div>' +
+    (sug ? '<div class="pl-sug small">' + ic("trend") + '<span>' + esc(t("ld.last", { load: fmtLoad(sug.last, t("hg.bw")) })) + ' · <b>' +
+      esc(t("ld.sug." + sug.why, { load: fmtLoad(sug.load, t("hg.bw")) })) + '</b></span></div>' : '') +
+    (load ? '<div class="pl-log-row"><span class="lb">' + esc(t("hg.load")) + '</span>' +
+      '<div class="hg-st-row"><button class="btn icon sm" data-act="play-load" data-v="-1" aria-label="−">−</button>' +
+        '<span class="hg-st-v">' + esc(fmtLoad(c.load, t("hg.bw"))) + '</span>' +
+        '<button class="btn icon sm" data-act="play-load" data-v="1" aria-label="+">+</button></div></div>' : '') +
+    (e.cat === "doigts" ? '<div class="pl-log-row"><span class="lb">' + esc(t("hg.edge")) + '</span><div class="row tight">' + edges.map(n =>
+      '<button class="filt' + (c.edge === n ? ' on' : '') + '" data-act="play-edge" data-v="' + n + '">' + n + '</button>').join("") + '</div></div>' : '') +
+    '<div class="pl-log-row"><span class="lb">' + esc(t("ld.effortQ")) + '</span><div class="row tight">' + SET_EFFORT.map(([k]) =>
+      '<button class="filt' + (c.effort === k ? ' on' : '') + '" data-act="play-effort" data-v="' + k + '">' + esc(t("ld.e." + k)) + '</button>').join("") + '</div></div>' +
+    (sets.length ? '<div class="pl-log-sets">' + sets.map((x, i) =>
+      '<span class="chip' + (x.failed ? ' crit' : '') + '">' + (i + 1) + ' · ' +
+        esc([x.load != null ? fmtLoad(x.load, t("hg.bw")) : "", x.edge ? x.edge + " mm" : "", x.reps != null ? t("ld.reps", { n: x.reps }) : "",
+             x.rpe ? t("ld.e." + (SET_EFFORT.find(y => y[1] === x.rpe) || ["ok"])[0]) : ""].filter(Boolean).join(" · ")) + '</span>').join("") + '</div>' : '') +
+    '<div class="row tight"><button class="btn icon" data-act="play-unlog" aria-label="−"' + (sets.length ? '' : ' disabled') + '>−</button>' +
+      '<button class="btn pri" style="flex:1" data-act="play-log">' + ic("plus") + esc(t("ld.setDone")) + '</button></div>' +
+  '</div>';
 }
 
 function viewDone(s, p, color){
@@ -202,4 +280,4 @@ function bindPlayer(){
   tick = setInterval(paint, 250);
 }
 
-export { bindPlayer, playerActions, startPlayer, stopPlayer, viewPlayer };
+export { bindPlayer, isHang, playerActions, startPlayer, stopPlayer, viewPlayer };

@@ -328,6 +328,30 @@ select t.ok('coach can remove a slot', t.rows('delete from call_slots where book
 reset role;
 select t.as(null);
 
+-- ================= training profile and session templates
+-- S1: expired trial, coach A (admin), no health consent. F1: premium, coach T1.
+select t.as(:S1); set role authenticated;
+select t.ok('expired, no consent: the climber keeps their training profile up to date', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''prefs'', ''prefs-s1'', ' || quote_literal(:S1) || ', ''{"gradeSport":"7a"}'')') = 1);
+select t.err('expired: no new session template', 'insert into athlete_docs (col, id, athlete_id, data) values (''routines'', ''r-s1'', ' || quote_literal(:S1) || ', ''{}'')');
+select t.err('cannot write the training profile of someone else', 'insert into athlete_docs (col, id, athlete_id, data) values (''prefs'', ''prefs-x'', ''00000000-0000-0000-0000-0000000000f1'', ''{}'')');
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('another coach does not see it', (select count(*) from athlete_docs where col = 'prefs') = 0);
+select t.ok('coach saves a template of their own', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''routines'', ''r-t1'', ' || quote_literal(:T1) || ', ''{"name":"Force"}'')') = 1);
+reset role;
+select t.as('00000000-0000-0000-0000-0000000000f1'); set role authenticated;
+select t.ok('premium climber saves a template', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''routines'', ''r-f1'', ''00000000-0000-0000-0000-0000000000f1'', ''{"name":"Mardi"}'')') = 1);
+select t.ok('a climber only sees their own templates', (select count(*) from athlete_docs where col = 'routines') = 1);
+select t.ok('nor the profile of another climber', (select count(*) from athlete_docs where col = 'prefs') = 0);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('the coach sees the templates of their climbers too', (select count(*) from athlete_docs where col = 'routines') = 2);
+reset role;
+select t.as(:A); set role authenticated;
+select t.ok('their coach (here the admin) reads the training profile', (select count(*) from athlete_docs where col = 'prefs' and athlete_id = :S1) = 1);
+reset role;
+select t.as(null);
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

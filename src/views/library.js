@@ -15,6 +15,7 @@ import { exercisePose, variantPose } from "../ui/poses.js";
 import { painLabel } from "./climber.js";
 import { callCard } from "./calls.js";
 import { View, isStaff, presenceDot, presenceText } from "./shell.js";
+import { gearSection, goalCard } from "./training.js";
 /* ================================================================
    15. EXERCISE BANK
    ================================================================ */
@@ -326,13 +327,11 @@ function viewProfile(me){
           rw(t("on.mainDisc"), t("on.disc." + (p.discipline || "both"))) +
           rw(t("pf.track"), track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) +
           rw(t("pf.coach"), coach ? coach.name : t("g.unassigned")) +
-          rw(t("pf.retest"), la ? fmtDate(addDays(la.date, cfg.testValidityDays), {day:"2-digit",month:"short",year:"numeric"}) : t("ov.doTest")) +
+          rw(t("pf.retest"), la ? fmtDate(addDays(la.date, cfg.retestDays), {day:"2-digit",month:"short",year:"numeric"}) : t("ov.doTest")) +
         '</div></div>' +
     '</div>' : '') +
 
-    (p.goalText ? '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("pf.goals")) + '</span>' +
-      '<p style="font-family:var(--serif);font-size:19px;line-height:1.4">' + esc(p.goalText) + '</p>' +
-      (p.goalDate ? '<span class="chip acc">' + esc(fmtDateLong(p.goalDate)) + '</span>' : '') + '</div>' : '') +
+    (me.role === "climber" ? goalCard(me, true) + gearSection(me) : '') +
 
     /* Formule du grimpeur (mode Supabase) : laquelle, jusqu'à quand pour l'essai, et la comparaison. */
     (me.role === "climber" && Remote.client ? (() => {

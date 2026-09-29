@@ -10,7 +10,7 @@
    PRECACHE lists every module. It is generated from the source tree —
    if you add a file under src/, add it here too or it will be missing
    offline. Bump VERSION on every release so clients refresh the cache. */
-const VERSION = "altaris-v1.20.0";
+const VERSION = "altaris-v1.21.0";
 const SHELL = VERSION + "-shell";
 const FONTS = VERSION + "-fonts";
 const PRECACHE = [
@@ -25,13 +25,19 @@ const PRECACHE = [
   "./src/config.js",
   "./src/core.js",
   "./src/data.js",
+  "./src/domain/benchmarks.js",
   "./src/domain/calendar.js",
   "./src/domain/exercises.js",
+  "./src/domain/gear.js",
   "./src/domain/grades.js",
+  "./src/domain/hang.js",
+  "./src/domain/loads.js",
+  "./src/domain/periodization.js",
   "./src/domain/plans.js",
   "./src/domain/program.js",
   "./src/domain/progress.js",
   "./src/domain/scoring.js",
+  "./src/domain/warmup.js",
   "./src/domain/workload.js",
   "./src/export.js",
   "./src/i18n/en-US.js",
@@ -49,19 +55,21 @@ const PRECACHE = [
   "./src/ui/icons.js",
   "./src/ui/poses.js",
   "./src/ui/tokens.css",
+  "./src/vendor/supabase.js",
   "./src/views/auth.js",
   "./src/views/calendar.js",
   "./src/views/calls.js",
   "./src/views/climber.js",
+  "./src/views/hang.js",
   "./src/views/library.js",
   "./src/views/onboarding.js",
   "./src/views/player.js",
   "./src/views/progress.js",
   "./src/views/shell.js",
   "./src/views/staff.js",
-  "./src/vendor/supabase.js",
   "./src/views/testing.js",
-  "./src/views/today.js"
+  "./src/views/today.js",
+  "./src/views/training.js"
 ];
 
 self.addEventListener("install", (e) => {

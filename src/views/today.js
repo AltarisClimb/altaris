@@ -18,6 +18,7 @@ import { exercisePose } from "../ui/poses.js";
 import { sessionsOf } from "./climber.js";
 import { callCard } from "./calls.js";
 import { getThread } from "./library.js";
+import { canTrainFree, goalCard, retestCard } from "./training.js";
 
 /** Couleur d'un type de séance (bande des cartes, pastilles). */
 const TYPE_COLOR = { boulder: "var(--s1)", lead: "var(--s2)", fingerboard: "var(--s6)", strength: "var(--s3)",
@@ -81,7 +82,10 @@ function viewToday(me){
         '</div>' +
         (first ? '<div class="td-fig">' + exercisePose(first.meta) + '</div>' : '') +
         '<div class="td-cta">' +
-          '<button class="btn pri td-go" data-act="play-start" data-v="' + esc(focus.id) + '">' + ic("play") + esc(t("td.start")) + '</button>' +
+          /* Séance de re-test : elle se fait dans l'onglet Tests. */
+          (focus.retest
+            ? '<button class="btn pri td-go" data-act="tab" data-v="tests">' + ic("test") + esc(t("rt.go")) + '</button>'
+            : '<button class="btn pri td-go" data-act="play-start" data-v="' + esc(focus.id) + '">' + ic("play") + esc(t("td.start")) + '</button>') +
           '<button class="btn ghost" data-act="session-open" data-v="' + esc(focus.id) + '">' + esc(t("td.details")) + '</button>' +
         '</div>' +
       '</div>'
@@ -110,6 +114,8 @@ function viewToday(me){
         '<span class="in-what">' + esc(fmtDate(s.date, { weekday: "long", day: "numeric", month: "long" })) + ' · ' + esc(t("ov.toValidate")) + '</span></span>' +
         '<button class="btn sm pri" data-act="validate" data-v="' + esc(s.id) + '">' + esc(t("ov.validate")) + '</button></div>').join("") + '</div>' : '') +
 
+    (plan !== "expired" ? retestCard(me) : '') +
+    goalCard(me, true) +
     '<div class="td-stats">' +
       '<div class="panel td-stat">' + ring(wk.done, wk.total) +
         '<div><span class="eyebrow">' + esc(t("cal.thisWeek")) + '</span>' +
@@ -129,6 +135,7 @@ function viewToday(me){
       '<div><button class="btn sm" data-act="tab" data-v="messages">' + ic("chat") + esc(t("in.reply")) + '</button></div></div>' : '') +
 
     '<div class="row tight noprint">' +
+      (canTrainFree(me) ? '<button class="btn sm" data-act="free-session">' + ic("timer") + esc(t("fs.title")) + '</button>' : '') +
       '<button class="btn sm ghost" data-act="pain-new">' + ic("pain") + esc(t("ov.reportPain")) + '</button>' +
       '<button class="btn sm ghost" data-act="tab" data-v="exercises">' + ic("book") + esc(t("td.library")) + '</button>' +
       '<button class="btn sm ghost" data-act="tab" data-v="tests">' + ic("test") + esc(t("nav.tests")) + '</button>' +

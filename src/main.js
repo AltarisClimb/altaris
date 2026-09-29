@@ -13,6 +13,7 @@ import { HIDDEN_TABS, TABS, View, legalFooter, tabsBar, topbar, watermark } from
 import { viewAdmin, viewAthleteFile, viewFleet, viewInbox, viewPlanning } from "./views/staff.js";
 import { bindTimer, updateLiveMetric, viewTests } from "./views/testing.js";
 import { bindPlayer, viewPlayer } from "./views/player.js";
+import { bindHang, viewHang } from "./views/hang.js";
 import { bindCallTimer, timerWidget } from "./views/calls.js";
 import { viewToday } from "./views/today.js";
 /* Import à effet de bord : actions.js n'exporte rien que main utilise,
@@ -33,8 +34,10 @@ function body(){
   const me = Session.live();
   if (!me) return viewAuth();
   if (me.role === "climber" && View.onb) return viewOnboarding();
+  if (View.hang) return viewHang();                                  // minuteur de suspension : par-dessus tout
   if (View.player) return viewPlayer();                              // séance guidée : plein écran, sans onglets
-  if (me.role === "climber" && !(me.profile||{}).onboarded && !View.onb){
+  /* En mode Supabase, attendre la synchronisation : le profil peut venir d'un autre appareil. */
+  if (me.role === "climber" && !(me.profile||{}).onboarded && !View.onb && (!Remote.client || Store.remoteSynced)){
     View.onb = { step:0, data: Object.assign({ sex:"x", discipline:"both", injuries:[], availability:[], goals:[] }, me.profile||{}) };
     return viewOnboarding();
   }
@@ -72,6 +75,7 @@ function render(){
   window.scrollTo(0, sy);
   if (View.runner){ bindTimer(); updateLiveMetric(); }
   if (View.player) bindPlayer();
+  bindHang();
   bindCallTimer();
 }
 

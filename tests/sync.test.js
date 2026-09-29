@@ -83,8 +83,33 @@ test("suppression : retirée du serveur", async () => {
 });
 
 test("les autres collections restent locales", async () => {
-  await Store.put("routines", "r-1", { coachId: COACH, name: "Poutre" });
+  await Store.put("config", "global", { painAlert: 5 });
   assert.deepEqual(calls, []);
+});
+
+test("un modèle de séance part sur le serveur, rattaché à son auteur", async () => {
+  await Store.put("routines", "r-1", { coachId: COACH, name: "Poutre" });
+  assert.deepEqual(calls, [["put", "r-1", COACH]]);
+  assert.equal(Store.data.routines["r-1"].userId, COACH);
+});
+
+test("le profil d'entraînement du grimpeur part sur le serveur, sans ses blessures", async () => {
+  Session.user = Store.data.users[ATH];
+  const me = Store.data.users[ATH];
+  await Store.put("users", ATH, Object.assign({}, me, { profile: { gradeSport: "7a", injuries: ["pulley"], goalDate: "2027-03-15" } }));
+  assert.deepEqual(calls, [["put", "prefs-" + ATH, ATH]]);
+  assert.equal(server["prefs-" + ATH].data.gradeSport, "7a");
+  assert.equal(server["prefs-" + ATH].data.injuries, undefined, "santé : reste sur l'appareil");
+  /* Rien de changé côté entraînement (ici : dernière activité) → pas de nouvel envoi. */
+  await Store.put("users", ATH, Object.assign({}, Store.data.users[ATH], { profile: Object.assign({}, Store.data.users[ATH].profile, { lastActive: 1 }) }));
+  assert.equal(calls.length, 1);
+});
+
+test("le coach reçoit le profil d'entraînement de son grimpeur", () => {
+  Store.data.prefs = { ["prefs-" + ATH]: { id: "prefs-" + ATH, userId: ATH, gradeSport: "7b", gear: { items: ["board"] } } };
+  Store.applyPrefs();
+  assert.equal(Store.data.users[ATH].profile.gradeSport, "7b");
+  assert.deepEqual(Store.data.users[ATH].profile.gear, { items: ["board"] });
 });
 
 test("santé sans consentement : la douleur reste sur l'appareil", async () => {

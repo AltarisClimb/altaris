@@ -66,6 +66,20 @@ function qualityDeltas(assessments){
     .sort((a, b) => b.delta - a.delta);
 }
 
+/**
+ * Re-test : le dernier bilan complet date-t-il de plus de `every` jours (8 semaines par défaut) ?
+ * { last (date ou null), next (date conseillée), due, days (jours depuis le dernier) }.
+ * Sans aucun bilan : due, pour proposer le premier.
+ */
+function retestStatus(assessments, every, day){
+  const d0 = day || today(), n = every || 56;
+  const done = (assessments || []).filter(a => a.status === "complete").map(a => a.date).sort();
+  const last = done[done.length - 1] || null;
+  if (!last) return { last: null, next: d0, due: true, days: null, first: true };
+  const next = addDays(last, n);
+  return { last, next, due: next <= d0, days: diffDays(d0, last), first: false };
+}
+
 /* Badges : calculés à partir des données, rien n'est stocké. value/target pour
    afficher la progression de ceux qui ne sont pas encore gagnés. */
 const BADGES = [
@@ -100,4 +114,4 @@ function badges(sessions, assessments){
   return BADGES.map(([id, f]) => { const [value, target] = f(x); return { id, value: Math.min(value, target), target, earned: value >= target }; });
 }
 
-export { badges, bestStreak, focusSession, qualityDeltas, toValidate, weekProgress, weekStreak };
+export { badges, bestStreak, focusSession, qualityDeltas, retestStatus, toValidate, weekProgress, weekStreak };

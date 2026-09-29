@@ -8,12 +8,24 @@ import { toast } from "./ui/feedback.js";
    Shared artifact database when granted, with a local write-behind
    cache so entries made at the wall survive a dropped connection.
    ================================================================ */
-const COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "config", "audit"];
+const COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "prefs", "config", "audit"];
 const LS_KEY = "altaris.cache.v1";
 const LS_Q   = "altaris.queue.v1";
 /* Collections stockées dans Supabase (table athlete_docs) quand le projet est
    configuré. Les autres restent sur l'appareil pour l'instant. */
-const REMOTE_COLS = ["sessions", "assessments", "pain"];
+const REMOTE_COLS = ["sessions", "assessments", "pain", "prefs", "routines"];
+/* Profil d'entraînement du grimpeur (prefs, un document par grimpeur, id
+   "prefs-<id>") : ce que son coach doit voir et qui doit suivre d'un appareil
+   à l'autre. Les blessures et douleurs (santé) n'en font pas partie. Le
+   document est recopié dans users[id].profile ; les modèles de séance
+   (routines) appartiennent à leur auteur (userId). */
+const PREF_KEYS = ["onboarded", "sex", "birthYear", "heightCm", "gradeSport", "gradeBoulder", "discipline", "years",
+                   "availability", "goals", "goalText", "goalDate", "goalFrom", "gear"];
+function pickPrefs(profile){
+  const o = {};
+  PREF_KEYS.forEach(k => { if (profile && profile[k] !== undefined) o[k] = profile[k]; });
+  return o;
+}
 /* Données de santé (RGPD art. 9) : envoyées seulement si le grimpeur a donné
    son consentement explicite ; le serveur le vérifie aussi (RLS). */
 const HEALTH_COLS = ["assessments", "pain"];
@@ -135,9 +147,15 @@ const Store = {
         catch(e){ toast(t("er.saveFailed"), "crit"); requestRender(); return false; }
       }
     }
+    if (col === "routines" && !obj.userId) obj = Object.assign({}, obj, { userId: obj.coachId });
     const doc = Object.assign({}, obj, { id: id });
     this.data[col] = this.data[col] || {};
     this.data[col][id] = doc;
+    if (col === "users" && Remote.client && Session.user && id === Session.user.id && doc.role === "climber"){
+      const prefs = pickPrefs(doc.profile), cur = this.get("prefs", "prefs-" + id);
+      const was = cur ? pickPrefs(cur) : {};
+      if (JSON.stringify(prefs) !== JSON.stringify(was)) this.put("prefs", "prefs-" + id, Object.assign({ userId: id }, prefs));
+    }
     this.saveLocal();
     if (!this.silent) requestRender();
     if (Remote.client && REMOTE_COLS.includes(col)){
@@ -224,7 +242,8 @@ const Store = {
       try{ adopted = !!localStorage.getItem(flag); }catch(e){}
       if (!adopted){
         let waiting = false;                     // données de santé sans consentement : on réessaiera plus tard
-        for (const d of Object.values(this.data[col] || {})){
+        for (let d of Object.values(this.data[col] || {})){
+          if (col === "routines" && !d.userId && d.coachId === Session.user.id) d = Object.assign({}, d, { userId: d.coachId });
           if (next[d.id] || !UUID.test(d.userId || "") || !Access.canSee(d.userId)) continue;
           if (HEALTH_COLS.includes(col) && !hasHealthConsent(this.get("users", d.userId))){ waiting = true; continue; }
           if (await this._putRemote(col, d.id, d)) next[d.id] = d;
@@ -240,9 +259,20 @@ const Store = {
         });
       this.data[col] = next;
     }
+    this.applyPrefs();
+    this.remoteSynced = true;
     await this.syncMessages();
     this.saveLocal();
     requestRender();
+  },
+
+  /** Recopie les profils d'entraînement (prefs) dans les documents "users". */
+  applyPrefs(){
+    for (const d of Object.values(this.data.prefs || {})){
+      const u = this.get("users", d.userId); if (!u) continue;
+      const p = Object.assign({}, u.profile || {}, pickPrefs(d));
+      this.data.users[u.id] = Object.assign({}, u, { profile: p });
+    }
   },
 
   /* ---------- messagerie ----------
@@ -317,6 +347,7 @@ const Store = {
       if (!REMOTE_COLS.includes(col)) return;
       this.data[col] = this.data[col] || {};
       if (row) this.data[col][id] = fromDocRow(row); else delete this.data[col][id];
+      if (col === "prefs") this.applyPrefs();
       this.saveLocal();
       if (!this.silent) requestRender();
     }, (row) => this.addMessage(row));
@@ -404,7 +435,7 @@ async function audit(action, detail){
 /* ---------------- global configuration ---------------- */
 const DEFAULT_CONFIG = {
   acwrLow: 0.8, acwrHigh: 1.3, acwrCrit: 1.5,
-  monoHigh: 2.0, testValidityDays: 84, painAlert: 4,
+  monoHigh: 2.0, testValidityDays: 84, retestDays: 56, painAlert: 4,
   thresholdSport: "7a", thresholdBoulder: "V6", acwrMethod: "ra"
 };
 function config(){ return Object.assign({}, DEFAULT_CONFIG, Store.get("config", "global") || {}); }
@@ -490,4 +521,4 @@ const Access = {
   }
 };
 
-export { Access, COLS, DEFAULT_CONFIG, HEALTH_COLS, LS_KEY, LS_Q, REMOTE_COLS, Session, Store, audit, can, config, fromDocRow, fromMessageRow, hasHealthConsent, isNetworkError, planOf, touch };
+export { Access, COLS, DEFAULT_CONFIG, HEALTH_COLS, LS_KEY, LS_Q, PREF_KEYS, REMOTE_COLS, pickPrefs, Session, Store, audit, can, config, fromDocRow, fromMessageRow, hasHealthConsent, isNetworkError, planOf, touch };

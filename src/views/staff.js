@@ -13,6 +13,8 @@ import { getThread } from "./library.js";
 import { INJURY_SITES } from "./onboarding.js";
 import { View, initials, isOnline, isStaff, presenceDot } from "./shell.js";
 import { duration } from "./today.js";
+import { hasGear } from "../domain/gear.js";
+import { benchPanel, comparePanel, goalCard, loadsPanel } from "./training.js";
 /* ================================================================
    18. COACH COMMAND CENTER
    ================================================================ */
@@ -85,7 +87,9 @@ function viewAthleteFile(me){
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("co.athleteFile")) + '</span>' +
       '<h2>' + esc(u.name) + '</h2>' +
       '<p>' + esc(track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) + ' · ' + esc(p.gradeSport||"—") + ' / ' + esc(p.gradeBoulder ? fontLabel(p.gradeBoulder) : "—") +
-      (p.weightKg ? ' · ' + p.weightKg + ' kg' : '') + (p.heightCm ? ' · ' + p.heightCm + ' cm' : '') + '</p></div>' +
+      (p.weightKg ? ' · ' + p.weightKg + ' kg' : '') + (p.heightCm ? ' · ' + p.heightCm + ' cm' : '') + '</p>' +
+      (hasGear(p.gear) && p.gear.items.length ? '<p class="small muted">' + esc(t("gr.title")) + ' : ' +
+        esc(p.gear.items.map(k => t("gr." + k)).join(", ")) + ((p.gear.edges || []).length ? ' · ' + esc(p.gear.edges.join("/")) + ' mm' : '') + '</p>' : '') + '</div>' +
       '<div class="row tight noprint">' +
         '<button class="btn sm pri" data-act="plan-athlete" data-v="' + esc(u.id) + '">' + ic("cal") + esc(t("co.plan")) + '</button>' +
         '<button class="btn sm" data-act="thread-go" data-v="' + esc(u.id) + '">' + ic("chat") + esc(t("ms.title")) + '</button>' +
@@ -124,6 +128,11 @@ function viewAthleteFile(me){
         '</div>' +
       '</div>' +
     '</div>' +
+
+    goalCard(u, false) +
+    benchPanel(u, la) +
+    comparePanel(u) +
+    loadsPanel(u, false) +
 
     '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("ld.title")) + '</span>' +
       workloadChart(acwrSeries(u.id, 42, View.acwrMethod)) + '</div>' +
@@ -251,6 +260,7 @@ function viewParams(){
     '<div class="panel pad stack"><span class="eyebrow">' + esc(t("ts.title")) + '</span>' +
       '<div class="grid g3">' +
         f("testValidityDays", t("ad.testValid") + " (" + t("g.days") + ")", 7) +
+        f("retestDays", t("ad.retestDays") + " (" + t("g.days") + ")", 7, t("ad.retestDaysD")) +
         f("painAlert", t("ad.painAlert"), 1) +
       '</div>' +
       '<div class="notice acc">' + ic("shield") + '<span><b>' + esc(t("ad.threshold")) + '</b> — ' +

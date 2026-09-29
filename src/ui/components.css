@@ -721,3 +721,69 @@ main > *{animation:fade-up .22s ease both}
 .ct.warn{border-color:var(--warn)} .ct.warn .ct-time{color:var(--warn)} .ct.warn .ct-bar span{background:var(--warn)}
 .ct.over{border-color:var(--line)} .ct.over .ct-time{color:var(--ink-3); font-size:18px}
 @media (max-width:640px){ .ct{left:16px; right:16px; width:auto} }
+
+/* ---------- journal des séries (séance guidée) ---------- */
+.pl-tools.one{grid-template-columns:1fr}
+.pl-log{padding:12px 14px}
+.pl-log-row{display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+.pl-log-row .lb{font-size:12px; color:var(--ink-2); font-weight:600}
+.pl-log-sets{display:flex; flex-wrap:wrap; gap:6px}
+.pl-sug{display:flex; gap:8px; align-items:flex-start; padding:8px 10px; border-radius:var(--r); background:var(--accent-wash); line-height:1.45}
+.pl-sug svg{width:16px; height:16px; flex:none; margin-top:2px; color:var(--accent)}
+.hg-open{min-height:52px; font-size:16px; border-radius:999px}
+
+/* ---------- minuteur de suspension (plein écran) ---------- */
+.hg-grid{display:grid; grid-template-columns:repeat(3, 1fr); gap:10px}
+.hg-st{display:flex; flex-direction:column; gap:6px; align-items:center; padding:10px 6px; border-radius:var(--r);
+  background:var(--surface-2); border:1px solid var(--line-soft)}
+.hg-st .lb{font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-3); text-align:center}
+.hg-st-row{display:flex; align-items:center; gap:10px}
+.hg-st-row .btn{width:38px; height:38px; border-radius:50%; font-size:18px; padding:0}
+.hg-st-v{font:700 20px var(--mono); min-width:58px; text-align:center}
+.hg-st-v small{font-size:12px; color:var(--ink-3); margin-left:2px}
+.hg.run{--ph:var(--warn); background:color-mix(in srgb, var(--ph) 16%, var(--bg)); transition:background .25s}
+.hg.run[data-kind="work"]{--ph:var(--crit)}
+.hg.run[data-kind="rest"]{--ph:var(--good)}
+.hg.run[data-kind="setRest"]{--ph:var(--s5)}
+.hg.run.paused{--ph:var(--ink-3)}
+.hg.run .pl-top{background:transparent; border-bottom-color:transparent}
+.hg-run{display:flex; flex-direction:column; align-items:center; gap:10px; padding:10px 16px 20px; text-align:center}
+.hg-phase{font:800 clamp(26px, 8vw, 44px)/1 var(--sans); letter-spacing:.08em; text-transform:uppercase; color:var(--ph)}
+.hg-time{font:700 clamp(120px, 42vw, 280px)/.95 var(--mono); color:var(--ink); font-variant-numeric:tabular-nums}
+.hg-count{display:flex; gap:18px; font:600 18px var(--sans); color:var(--ink-2)}
+.hg-bar{width:min(520px, 100%); height:8px; border-radius:4px; background:color-mix(in srgb, var(--ink) 12%, transparent); overflow:hidden}
+.hg-bar span{display:block; height:100%; background:var(--ph); transition:width .1s linear}
+.hg-next{color:var(--ink-2)}
+.hg-meta{color:var(--ink-3)}
+.hg-ctl{display:grid; grid-template-columns:1fr 1fr; gap:10px; max-width:520px; margin:0 auto; padding:0 16px 32px}
+.hg-ctl .btn{min-height:56px; font-size:16px; border-radius:999px; justify-content:center}
+@media (max-width:480px){ .hg-grid{grid-template-columns:repeat(2, 1fr)} }
+@media (prefers-reduced-motion:reduce){ .hg.run, .hg-bar span{transition:none} }
+
+/* ---------- objectif daté ---------- */
+.gl-empty{display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap}
+.gl-empty > div{flex:1 1 260px; display:flex; flex-direction:column; gap:4px}
+.gl-head{display:flex; gap:14px; align-items:center}
+.gl-days{flex:none; min-width:64px; height:64px; padding:0 8px; border-radius:var(--r-lg); display:grid; place-items:center;
+  background:var(--accent-wash); border:1px solid var(--accent-line); color:var(--accent); font:700 20px var(--mono)}
+.gl-text{font-family:var(--serif); font-size:20px; font-weight:600; line-height:1.2}
+.gl-bar{position:relative; display:flex; gap:2px; height:22px; border-radius:6px; overflow:hidden; margin-top:4px}
+.gl-bar span{display:flex; align-items:center; justify-content:center; min-width:0; overflow:hidden}
+.gl-bar em{font:600 10.5px var(--sans); font-style:normal; color:#fff; letter-spacing:.04em; text-transform:uppercase;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding:0 4px}
+.gl-bar i{position:absolute; top:-2px; bottom:-2px; width:3px; margin-left:-1px; border-radius:2px; background:var(--ink); box-shadow:0 0 0 2px var(--bg)}
+
+/* ---------- charges (Progrès, fiche athlète) ---------- */
+.lg-row{display:grid; grid-template-columns:1fr auto auto auto; gap:12px; align-items:center}
+.lg-line polyline{fill:none; stroke:var(--accent); stroke-width:2; stroke-linejoin:round; stroke-linecap:round}
+.lg-line circle{fill:var(--accent)}
+.lg-v{font:700 15px var(--mono); min-width:64px; text-align:right}
+@media (max-width:560px){ .lg-row{grid-template-columns:1fr auto} .lg-row svg{display:none} }
+
+/* ---------- séance libre ---------- */
+.fs-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:10px}
+.fs-card{display:flex; flex-direction:column; align-items:flex-start; gap:4px; padding:14px; border-radius:var(--r-lg); text-align:left;
+  background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink); cursor:pointer}
+.fs-card:hover{border-color:var(--accent-line)}
+.fs-card svg{width:22px; height:22px; color:var(--accent)}
+.fs-card span{font-size:12.5px; color:var(--ink-2)}

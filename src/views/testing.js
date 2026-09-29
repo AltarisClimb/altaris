@@ -8,6 +8,8 @@ import { progressLines } from "../ui/charts.js";
 import { toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { View } from "./shell.js";
+import { gradeEquivalent } from "../domain/benchmarks.js";
+import { comparePanel } from "./training.js";
 /* ================================================================
    14. TESTING ENGINE
    ================================================================ */
@@ -47,9 +49,12 @@ function viewTests(user){
         '<div class="stripe warn tiny muted" style="line-height:1.5">' + esc(t(x.key + ".s")) + '</div>' +
         (last && !last.skipped ? '<div class="row tight"><span class="chip acc">' +
             esc(fmtNum(x.metric(last), x.dec)) + ' ' + esc(x.unit) + '</span>' +
+            (() => { const eq = gradeEquivalent(x.id, last); return eq ? '<span class="chip" title="' + esc(t("bm.disclaimer")) + '">≈ ' + esc((eq.below ? "< " : "") + eq.grade) + '</span>' : ''; })() +
             '<span class="chip">' + esc(fmtDate(la.date)) + '</span></div>' : '') +
       '</div>';
     }).join("") + '</div>' +
+
+    comparePanel(u) +
 
     /* history */
     (hist.length ? '<div class="panel pad stack sm">' +

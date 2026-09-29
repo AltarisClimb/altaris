@@ -4,9 +4,14 @@
    Logique pure : à partir des disponibilités, du niveau et des points faibles
    du dernier bilan, propose des séances (échauffement, 3 exercices principaux,
    retour au calme) sur les jours libres. Intensité croissante sur 3 semaines,
-   la 4e allégée. Le coach peut ensuite tout ajuster dans sa grille. */
+   la 4e allégée. Le coach peut ensuite tout ajuster dans sa grille.
+   Avec un objectif daté, la phase du jour (periodization.js) choisit le thème
+   et l'intensité ; le matériel déclaré écarte les exercices infaisables ; un
+   re-test dû prend la place d'une séance. */
 import { addDays, today } from "../core.js";
 import { weekdayIndex } from "./calendar.js";
+import { usable } from "./gear.js";
+import { PHASE_INTENSITY, PHASE_THEMES, phaseOn } from "./periodization.js";
 
 /* Trois thèmes qui alternent sur les jours d'entraînement. */
 const THEMES = [
@@ -37,7 +42,8 @@ function slotMinutes(s){
 /**
  * opts : { userId, profile, exercises, weak (qualités faibles du dernier bilan),
  *          weeks (1 à 4), from (date ISO de début), until (date ISO max, essai), taken (dates déjà occupées),
- *          label (thème → titre traduit), programId }
+ *          label (thème → titre traduit), programId,
+ *          gear (matériel déclaré), phases (objectif daté), retestOn (date à partir de laquelle placer un re-test) }
  * Renvoie des documents « séance » prêts à enregistrer.
  */
 function generateProgram(opts){
@@ -52,7 +58,7 @@ function generateProgram(opts){
     .filter((s, i, arr) => i === 0 || s.day !== arr[i - 1].day)          // un seul créneau par jour
     .slice(0, 4);
   const weakCats = (o.weak || []).map(d => DOMAIN_CAT[d]).filter(Boolean);
-  const pool = (o.exercises || []).filter(e => !beginner || !e.lv || e.lv === "all");
+  const pool = (o.exercises || []).filter(e => (!beginner || !e.lv || e.lv === "all") && usable(e, o.gear));
   const byCat = (c) => pool.filter(e => e.cat === c);
 
   const pick = (list, n, rnd, avoid) => {
@@ -62,7 +68,8 @@ function generateProgram(opts){
   };
 
   const sessions = [];
-  let themeIdx = 0;
+  let themeIdx = 0, retestPlaced = !o.retestOn;
+  const phaseCount = {};
   for (let w = 0; w < weeks; w++){
     const rnd = seeded((o.userId || "") + "|" + (o.programId || "") + "|" + w);
     for (let d = 0; d < 7; d++){
@@ -70,7 +77,25 @@ function generateProgram(opts){
       if (o.until && date > o.until) continue;
       const slot = days.find(s => s.day === weekdayIndex(date));
       if (!slot || taken.has(date)) continue;
-      const theme = THEMES[themeIdx++ % THEMES.length];
+      const n = sessions.length + 1;
+      /* Re-test dû : le premier créneau à partir de la date conseillée. */
+      if (!retestPlaced && date >= o.retestOn){
+        retestPlaced = true;
+        sessions.push({
+          id: "prg-" + (o.programId || "p") + "-" + n, userId: o.userId, date, time: slot.start || "18:00",
+          title: o.label ? o.label("retest", w + 1) : "retest", type: "strength", plannedMin: 60, targetIntensity: 8,
+          exercises: [], notes: "", status: "planned", retest: true,
+          program: { id: o.programId || "p", week: w + 1, theme: "retest" }
+        });
+        continue;
+      }
+      const phase = phaseOn(o.phases, date);
+      let theme;
+      if (phase){
+        const list = PHASE_THEMES[phase], k = phaseCount[phase] = (phaseCount[phase] || 0) + 1;
+        theme = THEMES.find(x => x.key === list[(k - 1) % list.length]);
+      } else theme = THEMES[themeIdx++ % THEMES.length];
+      const taper = phase === "taper";
       /* Catégories : celles du thème, les points faibles du thème d'abord. */
       const cats = theme.cats.slice().sort((a, b) => (weakCats.includes(b) ? 1 : 0) - (weakCats.includes(a) ? 1 : 0));
       const used = new Set();
@@ -80,17 +105,18 @@ function generateProgram(opts){
         got.forEach(e => { used.add(e.id); main.push(e); });
         if (main.length >= 3) break;
       }
+      const nMain = taper ? 2 : 3;
       const warm = pick(byCat("echauffement"), 1, rnd, used);
       const cool = pick(byCat("recuperation").length ? byCat("recuperation") : byCat("mobilite"), 1, rnd, used);
-      const n = sessions.length + 1;
       sessions.push({
         id: "prg-" + (o.programId || "p") + "-" + n,
         userId: o.userId, date, time: slot.start || "18:00",
         title: (o.label ? o.label(theme.key, w + 1) : theme.key + " · S" + (w + 1)),
-        type: theme.type, plannedMin: slotMinutes(slot), targetIntensity: INTENSITY[w],
-        exercises: warm.concat(main.slice(0, 3), cool).map(e => e.id),
+        type: theme.type, plannedMin: taper ? Math.max(45, Math.round(slotMinutes(slot) * 0.7 / 5) * 5) : slotMinutes(slot),
+        targetIntensity: phase ? (w === 3 && !taper ? INTENSITY[3] : PHASE_INTENSITY[phase]) : INTENSITY[w],
+        exercises: warm.concat(main.slice(0, nMain), cool).map(e => e.id),
         notes: "", status: "planned",
-        program: { id: o.programId || "p", week: w + 1, theme: theme.key }
+        program: Object.assign({ id: o.programId || "p", week: w + 1, theme: theme.key }, phase ? { phase } : {})
       });
     }
   }
