@@ -14,7 +14,8 @@ import { goalOf } from "../domain/periodization.js";
 import { retestStatus } from "../domain/progress.js";
 import { TESTS, assessmentsOf } from "../domain/scoring.js";
 import { buildWarmup } from "../domain/warmup.js";
-import { fmtDate, fmtNum, t } from "../i18n/index.js";
+import { LANG, fmtDate, fmtNum, t } from "../i18n/index.js";
+import { sportLabel } from "../domain/grades.js";
 import { Modal, toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { sessionsOf } from "./climber.js";
@@ -71,10 +72,10 @@ function benchPanel(u, la){
   if (!b.length) return "";
   const grade = climberGrade(u.profile);
   return '<div class="panel pad stack sm"><div class="between"><span class="eyebrow">' + esc(t("bm.title")) + '</span>' +
-      (grade ? '<span class="chip">' + esc(t("bm.grade", { g: grade })) + '</span>' : '') + '</div>' +
+      (grade ? '<span class="chip">' + esc(t("bm.grade", { g: sportLabel(grade, LANG === "en") })) + '</span>' : '') + '</div>' +
     '<div class="rows">' + b.map(x =>
       '<div class="rw"><span class="stripe ' + (x.verdict === "weak" ? "crit" : x.verdict === "asset" ? "good" : "") + ' gr">' +
-        '<span class="t1">' + esc(t("d." + x.domain)) + ' ≈ <b>' + esc((x.below ? "< " : "") + x.grade) + '</b></span>' +
+        '<span class="t1">' + esc(t("d." + x.domain)) + ' ≈ <b>' + esc((x.below ? "< " : "") + sportLabel(x.grade, LANG === "en")) + '</b></span>' +
         '<span class="t2">' + esc(fmtNum(x.value, 0)) + ' ' + esc(x.unit) + (x.verdict ? ' · ' + esc(t("bm.v." + x.verdict)) : '') + '</span></span>' +
         (x.verdict === "weak" ? '<span class="chip crit">' + esc(t("bm.focus")) + '</span>' : x.verdict === "asset" ? '<span class="chip good">' + esc(t("bm.asset")) + '</span>' : '') +
       '</div>').join("") + '</div>' +

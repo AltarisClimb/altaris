@@ -1,10 +1,10 @@
 import { byId, diffDays, esc, iso, sum, today } from "../core.js";
 import { Access, Session, Store, config, planOf } from "../data.js";
-import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, fontLabel, trackFor } from "../domain/grades.js";
+import { FONT, SPORT, THRESHOLD_FONT_IDX, THRESHOLD_SPORT_IDX, boulderLabel, gradePair, sportLabel, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, latestAssessment, limiters } from "../domain/scoring.js";
 import { weekProgress } from "../domain/progress.js";
 import { acwrZone, alertsFor, computeACWR, loadSeries, monotonyStrain } from "../domain/workload.js";
-import { LI, fmtDate, fmtNum, fmtTime, relDays, t } from "../i18n/index.js";
+import { LANG, LI, fmtDate, fmtNum, fmtTime, relDays, t } from "../i18n/index.js";
 import { Remote } from "../remote.js";
 import { acwrSeries, progressLines, radarChart, sparkline, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
@@ -51,7 +51,7 @@ function viewFleet(me){
         return '<button class="fl-card ' + status + '" data-act="athlete" data-v="' + esc(c.id) + '">' +
           '<span class="fl-head"><span class="av-wrap"><span class="avatar">' + esc(initials(c.name)) + '</span>' + presenceDot(c) + '</span>' +
             '<span class="fl-name"><b>' + esc(c.name) + '</b>' +
-              '<span class="dim tiny">' + esc(p.gradeSport || "—") + ' / ' + esc(p.gradeBoulder || "—") + '</span></span>' +
+              '<span class="dim tiny">' + esc(gradePair(p, LANG === "en")) + '</span></span>' +
             '<span class="fl-dot ' + status + '" title="' + esc(t("fl." + status)) + '"></span></span>' +
           '<span class="fl-line">' + (isOnline(c) ? '<b class="pr-on">' + esc(t("pr.online")) + '</b> · ' : '') + esc(t("fl.week", { done: wk.done, total: wk.total })) + ' · ' +
             esc(last ? t("fl.lastDone", { when: relDays(last.date) }) : t("fl.noneDone")) + '</span>' +
@@ -86,7 +86,7 @@ function viewAthleteFile(me){
     '<div class="row noprint"><button class="btn sm ghost" data-act="athlete" data-v="">' + ic("chevL") + esc(t("g.back")) + '</button></div>' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("co.athleteFile")) + '</span>' +
       '<h2>' + esc(u.name) + '</h2>' +
-      '<p>' + esc(track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) + ' · ' + esc(p.gradeSport||"—") + ' / ' + esc(p.gradeBoulder ? fontLabel(p.gradeBoulder) : "—") +
+      '<p>' + esc(track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) + ' · ' + esc(gradePair(p, LANG === "en")) +
       (p.weightKg ? ' · ' + p.weightKg + ' kg' : '') + (p.heightCm ? ' · ' + p.heightCm + ' cm' : '') + '</p>' +
       (hasGear(p.gear) && p.gear.items.length ? '<p class="small muted">' + esc(t("gr.title")) + ' : ' +
         esc(p.gear.items.map(k => t("gr." + k)).join(", ")) + ((p.gear.edges || []).length ? ' · ' + esc(p.gear.edges.join("/")) + ' mm' : '') + '</p>' : '') + '</div>' +
@@ -227,7 +227,7 @@ function viewPairings(){
       '<th>' + esc(t("role.climber")) + '</th><th>' + esc(t("pf.level")) + '</th><th>' + esc(t("ad.assignCoach")) + '</th></tr></thead><tbody>' +
       climbers.map(c => '<tr><td><span class="row tight nowrap"><span class="avatar sm">' + esc(initials(c.name)) + '</span>' +
         '<span style="font-weight:600">' + esc(c.name) + '</span></span></td>' +
-        '<td><span class="chip">' + esc((c.profile||{}).gradeSport || "—") + ' / ' + esc((c.profile||{}).gradeBoulder || "—") + '</span></td>' +
+        '<td><span class="chip">' + esc(gradePair(c.profile, LANG === "en")) + '</span></td>' +
         '<td><select class="inp" style="min-height:36px;max-width:260px" data-act-change="pair" data-v="' + esc(c.id) + '">' +
           '<option value="">' + esc(t("g.unassigned")) + '</option>' +
           coaches.map(k => '<option value="' + esc(k.id) + '"' + (c.coachId === k.id ? " selected" : "") + '>' + esc(k.name) + '</option>').join("") +
@@ -264,7 +264,7 @@ function viewParams(){
         f("painAlert", t("ad.painAlert"), 1) +
       '</div>' +
       '<div class="notice acc">' + ic("shield") + '<span><b>' + esc(t("ad.threshold")) + '</b> — ' +
-        esc(SPORT[THRESHOLD_SPORT_IDX]) + ' / ' + esc(fontLabel(FONT[THRESHOLD_FONT_IDX])) + '. ' + esc(t("on.levelQD")) + '</span></div>' +
+        esc(sportLabel(SPORT[THRESHOLD_SPORT_IDX], LANG === "en")) + ' / ' + esc(boulderLabel(FONT[THRESHOLD_FONT_IDX], LANG === "en")) + '. ' + esc(t("on.levelQD")) + '</span></div>' +
     '</div>' +
   '</div>';
 }

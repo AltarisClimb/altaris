@@ -15,6 +15,7 @@ import { askPin, newAccountModal, remoteForgot, remoteSetPassword, remoteSignIn,
 import { bookModal, callIcs, cancelCall, closeTimer, coachCallsModal, coachJoin, warnClimber } from "./views/calls.js";
 import { calDate, calMode, shiftDate } from "./views/calendar.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
+import { rangeText } from "./views/onboarding.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { closeHang, hangActions, hangSets, openHang } from "./views/hang.js";
 import { freeSessionModal, gearModal, goalModal } from "./views/training.js";
@@ -290,7 +291,7 @@ function collectOnb(){
   $$("[data-onb]").forEach(el => {
     const k = el.dataset.onb;
     if (el.type === "checkbox") View.onb.data[k] = el.checked;
-    else if (el.type === "number") View.onb.data[k] = el.value === "" ? null : Number(el.value);
+    else if (el.type === "number" || el.type === "range" || el.dataset.num) View.onb.data[k] = el.value === "" ? null : Number(el.value);
     else View.onb.data[k] = el.value;
   });
   const inj = [];
@@ -330,6 +331,11 @@ document.addEventListener("input", (e) => {
     return;
   }
   if (e.target.closest("[data-rf]")) updateLiveMetric();
+  /* Curseurs (taille, poids) : valeur affichée en direct. */
+  if (e.target.matches && e.target.matches("input.rg")){
+    const out = e.target.closest("label") && e.target.closest("label").querySelector(".rg-v");
+    if (out) out.textContent = rangeText(e.target.value, e.target.dataset.unit || "");
+  }
   if (e.target.closest("[data-onb-inj]")){
     const l = e.target.closest("label"); if (l) l.classList.toggle("on", e.target.checked);
   }

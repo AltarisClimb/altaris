@@ -1,10 +1,10 @@
 import { $, $$, addDays, byId, esc, uid } from "../core.js";
 import { Access, Session, Store, audit, can, config, planOf } from "../data.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
-import { fontLabel, trackFor } from "../domain/grades.js";
+import { boulderLabel, sportLabel, trackFor } from "../domain/grades.js";
 import { trialDaysLeft } from "../domain/plans.js";
 import { latestAssessment } from "../domain/scoring.js";
-import { LI, LOC, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
+import { LANG, LI, LOC, fmtDate, fmtDateLong, fmtTime, t } from "../i18n/index.js";
 import { body, render } from "../main.js";
 import { VAPID_PUBLIC_KEY } from "../config.js";
 import { Remote } from "../remote.js";
@@ -322,8 +322,8 @@ function viewProfile(me){
         '<button class="btn sm noprint" data-act="profile-edit">' + ic("edit") + esc(t("g.edit")) + '</button></div>' +
       '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("pf.level")) + '</span>' +
         '<div class="rows">' +
-          rw(t("on.gradeSport"), p.gradeSport || "—") +
-          rw(t("on.gradeBoulder"), p.gradeBoulder ? fontLabel(p.gradeBoulder) : "—") +
+          rw(t("on.gradeSport"), sportLabel(p.gradeSport, LANG === "en")) +
+          rw(t("on.gradeBoulder"), boulderLabel(p.gradeBoulder, LANG === "en")) +
           rw(t("on.mainDisc"), t("on.disc." + (p.discipline || "both"))) +
           rw(t("pf.track"), track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) +
           rw(t("pf.coach"), coach ? coach.name : t("g.unassigned")) +

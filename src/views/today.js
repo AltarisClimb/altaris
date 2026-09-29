@@ -137,7 +137,6 @@ function viewToday(me){
     '<div class="row tight noprint">' +
       (canTrainFree(me) ? '<button class="btn sm" data-act="free-session">' + ic("timer") + esc(t("fs.title")) + '</button>' : '') +
       '<button class="btn sm ghost" data-act="pain-new">' + ic("pain") + esc(t("ov.reportPain")) + '</button>' +
-      '<button class="btn sm ghost" data-act="tab" data-v="exercises">' + ic("book") + esc(t("td.library")) + '</button>' +
       '<button class="btn sm ghost" data-act="tab" data-v="tests">' + ic("test") + esc(t("nav.tests")) + '</button>' +
     '</div>' +
   '</div>';

@@ -930,5 +930,7 @@ export default {
   "prg.goal": "Goal “{text}” in {n} days: programme set to the {p} phase.",
   "prg.retest": "A retest is scheduled: your last assessment is getting old.",
   "ld.titleCoach": "Logged loads",
-  "gl.titleCoach": "Climber's goal"
+  "gl.titleCoach": "Climber's goal",
+  "av.brush": "Session type to place",
+  "av.hint": "Pick a type, then drag on the grid to draw a slot (across several days by dragging sideways). On touch: tap the start, then the end. Going over a slot of the same type erases it."
 };

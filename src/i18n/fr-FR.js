@@ -930,5 +930,7 @@ export default {
   "prg.goal": "Objectif « {text} » dans {n} jours : programme calé sur la phase {p}.",
   "prg.retest": "Un re-test est prévu : votre dernier bilan commence à dater.",
   "ld.titleCoach": "Charges notées",
-  "gl.titleCoach": "Objectif du grimpeur"
+  "gl.titleCoach": "Objectif du grimpeur",
+  "av.brush": "Type de séance à placer",
+  "av.hint": "Choisissez un type, puis glissez sur la grille pour tracer une plage (sur plusieurs jours en glissant de côté). Au doigt : touchez le début puis la fin. Repasser sur une plage du même type l'efface."
 };

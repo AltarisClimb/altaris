@@ -3,12 +3,13 @@ import { Store, config } from "../data.js";
 import { trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, band, batteryFor, latestAssessment } from "../domain/scoring.js";
 import { maxLoadBlocked } from "../domain/workload.js";
-import { LI, fmtDate, fmtNum, t } from "../i18n/index.js";
+import { LANG, LI, fmtDate, fmtNum, t } from "../i18n/index.js";
 import { progressLines } from "../ui/charts.js";
 import { toast } from "../ui/feedback.js";
 import { ic } from "../ui/icons.js";
 import { View } from "./shell.js";
 import { gradeEquivalent } from "../domain/benchmarks.js";
+import { sportLabel } from "../domain/grades.js";
 import { comparePanel } from "./training.js";
 /* ================================================================
    14. TESTING ENGINE
@@ -49,7 +50,7 @@ function viewTests(user){
         '<div class="stripe warn tiny muted" style="line-height:1.5">' + esc(t(x.key + ".s")) + '</div>' +
         (last && !last.skipped ? '<div class="row tight"><span class="chip acc">' +
             esc(fmtNum(x.metric(last), x.dec)) + ' ' + esc(x.unit) + '</span>' +
-            (() => { const eq = gradeEquivalent(x.id, last); return eq ? '<span class="chip" title="' + esc(t("bm.disclaimer")) + '">≈ ' + esc((eq.below ? "< " : "") + eq.grade) + '</span>' : ''; })() +
+            (() => { const eq = gradeEquivalent(x.id, last); return eq ? '<span class="chip" title="' + esc(t("bm.disclaimer")) + '">≈ ' + esc((eq.below ? "< " : "") + sportLabel(eq.grade, LANG === "en")) + '</span>' : ''; })() +
             '<span class="chip">' + esc(fmtDate(la.date)) + '</span></div>' : '') +
       '</div>';
     }).join("") + '</div>' +

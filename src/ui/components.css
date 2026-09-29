@@ -787,3 +787,19 @@ main > *{animation:fade-up .22s ease both}
 .fs-card:hover{border-color:var(--accent-line)}
 .fs-card svg{width:22px; height:22px; color:var(--accent)}
 .fs-card span{font-size:12.5px; color:var(--ink-2)}
+
+/* ---------- grille des disponibilités (grimpeur) ---------- */
+.avg{display:flex; flex-direction:column; gap:8px}
+.avg-brush{display:flex; flex-wrap:wrap; gap:6px}
+.avg-b i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px}
+.avg-grid{max-height:52vh}
+.avg-grid .vg-c{height:18px}
+.avg-c.on{background:var(--type)}
+.avg-c.pend{outline:2px solid var(--accent); outline-offset:-2px}
+.avg-c.anchor{box-shadow:inset 0 0 0 2px var(--ink); background:var(--accent-line)}
+.avg-sum{line-height:1.6}
+
+/* ---------- curseurs (taille, poids) ---------- */
+.rg-lb{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
+.rg-v{font:700 14px var(--mono); color:var(--ink); letter-spacing:0; text-transform:none}
+.rg{width:100%; height:28px; accent-color:var(--accent); cursor:pointer}

@@ -1,8 +1,9 @@
 import { esc } from "../core.js";
-import { FONT, SPORT, fontLabel, trackFor } from "../domain/grades.js";
-import { LI, t } from "../i18n/index.js";
+import { boulderOptions, sportOptions, trackFor } from "../domain/grades.js";
+import { LANG, LI, t } from "../i18n/index.js";
 import { ic } from "../ui/icons.js";
 import { View } from "./shell.js";
+import { availGrid } from "./availgrid.js";
 /* ================================================================
    11. ONBOARDING — level-based routing (CDC §4)
    ================================================================ */
@@ -30,17 +31,17 @@ function viewOnboarding(){
       '<p class="muted small">' + esc(t("on.welcomeD")) + '</p></div>' +
       '<div class="grid g2">' +
         fSelect("sex", t("on.sex"), [["f",t("on.sex.f")],["m",t("on.sex.m")],["x",t("on.sex.x")]], d.sex, t("on.sexHint")) +
-        fNum("birthYear", t("on.birth"), "", d.birthYear, 1, 1930, 2020) +
-        fNum("heightCm", t("on.height"), "cm", d.heightCm, 1, 120, 230) +
-        fNum("weightKg", t("on.weight"), "kg", d.weightKg, .1, 30, 200, t("on.weightHint")) +
+        fYear("birthYear", t("on.birth"), d.birthYear) +
+        fRange("heightCm", t("on.height"), "cm", d.heightCm, 120, 220, 1, 170) +
+        fRange("weightKg", t("on.weight"), "kg", d.weightKg, 30, 130, .5, 65, t("on.weightHint")) +
       '</div></div>';
   } else if (step === 1){
     body = '<div class="stack">' +
       '<div class="stack sm"><h2 class="serif" style="font-size:25px">' + esc(t("on.levelQ")) + '</h2>' +
       '<p class="muted small">' + esc(t("on.levelQD")) + '</p></div>' +
       '<div class="grid g2">' +
-        fSelect("gradeSport", t("on.gradeSport"), [["",""]].concat(SPORT.map(g => [g,g])), d.gradeSport) +
-        fSelect("gradeBoulder", t("on.gradeBoulder"), [["",""]].concat(FONT.map(g => [g, fontLabel(g)])), d.gradeBoulder) +
+        fSelect("gradeSport", t("on.gradeSport"), [["",""]].concat(sportOptions(LANG === "en")), d.gradeSport) +
+        fSelect("gradeBoulder", t("on.gradeBoulder"), [["",""]].concat(boulderOptions(LANG === "en", d.gradeBoulder)), d.gradeBoulder) +
         fSelect("discipline", t("on.mainDisc"), [["boulder",t("on.disc.boulder")],["sport",t("on.disc.sport")],["both",t("on.disc.both")]], d.discipline) +
         fNum("years", t("on.years"), "", d.years, .5, 0, 60) +
       '</div>' +
@@ -63,18 +64,8 @@ function viewOnboarding(){
     body = '<div class="stack">' +
       '<div class="stack sm"><h2 class="serif" style="font-size:25px">' + esc(t("on.avail")) + '</h2>' +
       '<p class="muted small">' + esc(t("on.availD")) + '</p></div>' +
-      (d.availability.length ? '<div class="panel rows">' + d.availability.map((s, i) =>
-        '<div class="rw"><span class="gr"><span class="t1">' + esc(DAYS[s.day][LI()]) + ' · ' + esc(s.start) + '–' + esc(s.end) + '</span>' +
-        '<span class="t2">' + esc(t("st."+s.type)) + '</span></span>' +
-        '<button class="btn icon sm ghost" data-act="onb-rmslot" data-v="' + i + '" aria-label="' + esc(t("g.delete")) + '">' + ic("trash") + '</button></div>').join("") + '</div>' : '') +
-      '<div class="panel pad stack sm"><div class="grid g4">' +
-        '<label class="f"><span class="lb">' + esc(t("g.week")) + '</span><select class="inp" id="sl-day">' +
-          DAYS.map((dd, i) => '<option value="' + i + '">' + esc(dd[LI()]) + '</option>').join("") + '</select></label>' +
-        '<label class="f"><span class="lb">' + esc(t("ts.work")) + '</span><input class="inp num" id="sl-start" type="time" value="18:00"></label>' +
-        '<label class="f"><span class="lb">' + esc(t("ts.restp")) + '</span><input class="inp num" id="sl-end" type="time" value="20:00"></label>' +
-        '<label class="f"><span class="lb">' + esc(t("g.type")) + '</span><select class="inp" id="sl-type">' +
-          SESSION_TYPES.filter(x => x !== "rest").map(x => '<option value="' + x + '">' + esc(t("st."+x)) + '</option>').join("") + '</select></label>' +
-      '</div><button class="btn sm" data-act="onb-addslot">' + ic("plus") + esc(t("on.addSlot")) + '</button></div></div>';
+      availGrid("onb", { get: () => View.onb.data.availability, set: (s) => { View.onb.data.availability = s; } }) +
+    '</div>';
   } else {
     body = '<div class="stack">' +
       '<div class="stack sm"><h2 class="serif" style="font-size:25px">' + esc(t("on.goals")) + '</h2></div>' +
@@ -100,6 +91,22 @@ function viewOnboarding(){
 }
 
 /* small form field builders */
+/** Année de naissance : menu déroulant, de la plus récente (8 ans) à 1930. data-num : relue en nombre. */
+function fYear(k, lb, v){
+  const top = new Date().getFullYear() - 8, years = [];
+  for (let y = top; y >= 1930; y--) years.push(y);
+  return '<label class="f"><span class="lb">' + esc(lb) + '</span><select class="inp" data-onb="' + k + '" data-num="1">' +
+    '<option value=""></option>' + years.map(y => '<option value="' + y + '"' + (Number(v) === y ? " selected" : "") + '>' + y + '</option>').join("") +
+    '</select></label>';
+}
+/** Curseur avec la valeur affichée à côté du libellé (mise à jour en direct par actions.js). */
+function fRange(k, lb, unit, v, min, max, step, def, hint){
+  const val = v == null || v === "" ? def : v;
+  return '<label class="f"><span class="lb rg-lb">' + esc(lb) + '<b class="rg-v">' + esc(rangeText(val, unit)) + '</b></span>' +
+    '<input class="rg" type="range" data-onb="' + k + '" data-unit="' + esc(unit) + '" min="' + min + '" max="' + max + '" step="' + step + '" value="' + val + '">' +
+    (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</label>';
+}
+function rangeText(v, unit){ return Number(v).toLocaleString(LANG === "en" ? "en-US" : "fr-FR", { maximumFractionDigits: 1 }) + " " + unit; }
 function fNum(k, lb, unit, v, step, min, max, hint){
   return '<label class="f"><span class="lb">' + esc(lb) + '</span>' +
     (unit ? '<span class="unit"><input class="inp num" type="number" data-onb="' + k + '" value="' + (v==null?"":v) + '" step="' + (step||1) + '"' +
@@ -113,4 +120,4 @@ function fSelect(k, lb, opts, v, hint){
     '</select>' + (hint ? '<span class="hint">' + esc(hint) + '</span>' : '') + '</label>';
 }
 
-export { DAYS, INJURY_SITES, ONB_STEPS, SESSION_TYPES, fNum, fSelect, viewOnboarding };
+export { DAYS, INJURY_SITES, ONB_STEPS, SESSION_TYPES, fNum, fRange, fSelect, fYear, rangeText, viewOnboarding };

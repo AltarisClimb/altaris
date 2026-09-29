@@ -3,10 +3,10 @@ import { Store, config } from "../data.js";
 import { Remote } from "../remote.js";
 import { sessionStart, upcomingForAgenda, weekdayIndex } from "../domain/calendar.js";
 import { exById, exName } from "../domain/exercises.js";
-import { fontLabel, trackFor } from "../domain/grades.js";
+import { gradePair, trackFor } from "../domain/grades.js";
 import { DOMAIN_ORDER, assessmentsOf, band, latestAssessment, limiters } from "../domain/scoring.js";
 import { acwrZone, computeACWR, monotonyStrain } from "../domain/workload.js";
-import { LI, fmtDate, fmtNum, relDays, t } from "../i18n/index.js";
+import { LANG, LI, fmtDate, fmtNum, relDays, t } from "../i18n/index.js";
 import { acwrGauge, acwrSeries, radarChart, typeBars, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
 import { calDate, calMode, calToolbar, monthView, yearView } from "./calendar.js";
@@ -56,7 +56,7 @@ function viewOverview(user){
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("role.climber.portal")) + '</span>' +
       '<h2>' + esc(t("ov.hello")) + ', ' + esc(u.name.split(" ")[0]) + '</h2>' +
       '<p>' + esc(track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) + ' · ' +
-        esc(p.gradeSport || "—") + ' / ' + esc(p.gradeBoulder ? fontLabel(p.gradeBoulder) : "—") + '</p></div>' +
+        esc(gradePair(p, LANG === "en")) + '</p></div>' +
       '<div class="row tight noprint">' +
         '<button class="btn sm" data-act="pain-new">' + ic("pain") + esc(t("ov.reportPain")) + '</button>' +
         '<button class="btn sm ghost" data-act="print">' + ic("print") + esc(t("g.print")) + '</button></div></div>' +

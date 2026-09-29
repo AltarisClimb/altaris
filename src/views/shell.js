@@ -42,6 +42,12 @@ const TABS = {
 /** Onglets ouverts sans figurer dans la barre : le profil (avatar), et pour le
     grimpeur les tests et la bibliothèque (liens depuis Aujourd'hui et Progrès). */
 const HIDDEN_TABS = ["profile", "tests", "exercises"];
+/** Onglet ouvert à ce rôle ? La bibliothèque d'exercices est réservée aux encadrants :
+ *  le grimpeur ne voit que les exercices de ses séances (fiche exercice). */
+function tabAllowed(role, tab){
+  if (tab === "exercises" && role === "climber") return false;
+  return (TABS[role] || []).some(x => x[0] === tab) || HIDDEN_TABS.includes(tab);
+}
 
 /** Coach ou admin : tout ce qui relève de l'encadrement. */
 function isStaff(u){ return !!u && (u.role === "coach" || u.role === "admin"); }
@@ -126,4 +132,4 @@ function watermark(){
   return '<div class="wmark" aria-hidden="true">' + s + '</div>';
 }
 
-export { HIDDEN_TABS, TABS, View, initials, isOnline, isStaff, legalFooter, presenceDot, presenceText, tabBadge, tabsBar, topbar, watermark };
+export { HIDDEN_TABS, tabAllowed, TABS, View, initials, isOnline, isStaff, legalFooter, presenceDot, presenceText, tabBadge, tabsBar, topbar, watermark };

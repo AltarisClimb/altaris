@@ -4,7 +4,7 @@ import { FEATURES } from "./domain/plans.js";
 import { Remote } from "./remote.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
-import { FONT, SPORT, fontLabel, trackFor } from "./domain/grades.js";
+import { boulderOptions, sportOptions, trackFor } from "./domain/grades.js";
 import { generateProgram } from "./domain/program.js";
 import { latestAssessment } from "./domain/scoring.js";
 import { focusDomains } from "./domain/benchmarks.js";
@@ -19,8 +19,9 @@ import { Modal, toast } from "./ui/feedback.js";
 import { ic } from "./ui/icons.js";
 import { PAIN_SITES, kpi, painLabel } from "./views/climber.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
-import { DAYS, SESSION_TYPES, fNum, fSelect } from "./views/onboarding.js";
+import { DAYS, SESSION_TYPES, fNum, fRange, fSelect, fYear } from "./views/onboarding.js";
 import { saveTemplate, sessionLog } from "./views/training.js";
+import { availGrid, bindAvailGrids } from "./views/availgrid.js";
 /* ================================================================
    20. MODALS — session sheet, RPE validation, block editor,
        pain report, availability, profile, account, legal
@@ -286,33 +287,12 @@ function painModal(){
 function availModal(){
   const me = Session.live();
   let slots = ((me.profile||{}).availability || []).slice();
-  const paint = (root) => {
-    $("#av-list", root).innerHTML = slots.length ? slots.map((s, i) =>
-      '<div class="rw"><span class="gr"><span class="t1">' + esc(DAYS[s.day][LI()]) + ' · ' + esc(s.start) + '–' + esc(s.end) + '</span>' +
-      '<span class="t2">' + esc(t("st."+s.type)) + '</span></span>' +
-      '<button class="btn icon sm ghost" data-rm="' + i + '">' + ic("trash") + '</button></div>').join("")
-      : '<div class="empty" style="padding:16px"><div class="d">' + esc(t("on.availD")) + '</div></div>';
-    $$("[data-rm]", root).forEach(b => b.onclick = () => { slots.splice(Number(b.dataset.rm), 1); paint(root); });
-  };
   Modal.open({
-    title: t("cal.editAvail"),
-    body: '<div class="stack"><div class="panel rows" id="av-list"></div>' +
-      '<div class="grid g4">' +
-        '<label class="f"><span class="lb">' + esc(t("g.week")) + '</span><select class="inp" id="av-day">' +
-          DAYS.map((d, i) => '<option value="' + i + '">' + esc(d[LI()]) + '</option>').join("") + '</select></label>' +
-        '<label class="f"><span class="lb">' + esc(t("ts.work")) + '</span><input class="inp num" type="time" id="av-s" value="18:00"></label>' +
-        '<label class="f"><span class="lb">' + esc(t("ts.restp")) + '</span><input class="inp num" type="time" id="av-e" value="20:00"></label>' +
-        '<label class="f"><span class="lb">' + esc(t("g.type")) + '</span><select class="inp" id="av-t">' +
-          SESSION_TYPES.filter(x => x !== "rest").map(x => '<option value="' + x + '">' + esc(t("st."+x)) + '</option>').join("") + '</select></label>' +
-      '</div><button class="btn sm" id="av-add">' + ic("plus") + esc(t("on.addSlot")) + '</button></div>',
+    title: t("cal.editAvail"), wide: true,
+    body: '<div class="stack">' + availGrid("modal", { get: () => slots, set: (s) => { slots = s; } }) + '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button><button class="btn pri" id="av-ok">' + esc(t("g.save")) + '</button>',
     onMount(root){
-      paint(root);
-      $("#av-add", root).onclick = () => {
-        slots.push({ day: Number($("#av-day", root).value), start: $("#av-s", root).value, end: $("#av-e", root).value, type: $("#av-t", root).value });
-        slots.sort((a,b) => a.day - b.day || (a.start < b.start ? -1 : 1));
-        paint(root);
-      };
+      bindAvailGrids(root);
       $("[data-c]", root).onclick = () => Modal.close();
       $("#av-ok", root).onclick = async () => {
         const u = Session.live();
@@ -330,11 +310,11 @@ function profileEditModal(){
     title: t("pf.title"), wide: true,
     body: '<div class="stack"><div class="grid g2">' +
       fSelect("sex", t("on.sex"), [["f",t("on.sex.f")],["m",t("on.sex.m")],["x",t("on.sex.x")]], p.sex) +
-      fNum("birthYear", t("on.birth"), "", p.birthYear, 1) +
-      fNum("heightCm", t("on.height"), "cm", p.heightCm, 1) +
-      fNum("weightKg", t("on.weight"), "kg", p.weightKg, .1) +
-      fSelect("gradeSport", t("on.gradeSport"), [["",""]].concat(SPORT.map(g=>[g,g])), p.gradeSport) +
-      fSelect("gradeBoulder", t("on.gradeBoulder"), [["",""]].concat(FONT.map(g=>[g,fontLabel(g)])), p.gradeBoulder) +
+      fYear("birthYear", t("on.birth"), p.birthYear) +
+      fRange("heightCm", t("on.height"), "cm", p.heightCm, 120, 220, 1, 170) +
+      fRange("weightKg", t("on.weight"), "kg", p.weightKg, 30, 130, .5, 65) +
+      fSelect("gradeSport", t("on.gradeSport"), [["",""]].concat(sportOptions(LANG === "en")), p.gradeSport) +
+      fSelect("gradeBoulder", t("on.gradeBoulder"), [["",""]].concat(boulderOptions(LANG === "en", p.gradeBoulder)), p.gradeBoulder) +
       fSelect("discipline", t("on.mainDisc"), [["boulder",t("on.disc.boulder")],["sport",t("on.disc.sport")],["both",t("on.disc.both")]], p.discipline) +
       fNum("years", t("on.years"), "", p.years, .5) +
     '</div>' +
@@ -349,7 +329,7 @@ function profileEditModal(){
         const np = Object.assign({}, p);
         $$("[data-onb]", root).forEach(el => {
           const k = el.dataset.onb;
-          np[k] = el.type === "number" ? (el.value === "" ? null : Number(el.value)) : el.value;
+          np[k] = (el.type === "number" || el.type === "range" || el.dataset.num) ? (el.value === "" ? null : Number(el.value)) : el.value;
         });
         await Store.put("users", u.id, Object.assign({}, u, { profile: np }));
         audit("profile_updated", "");
