@@ -352,6 +352,35 @@ select t.ok('their coach (here the admin) reads the training profile', (select c
 reset role;
 select t.as(null);
 
+-- ================= videos, logbook and media storage
+-- F1: premium, coach T1. F2: standard, coach T1. S1: expired trial, coach A.
+select t.as('00000000-0000-0000-0000-0000000000f2'); set role authenticated;
+select t.err('standard: cannot send a video for analysis', 'insert into athlete_docs (col, id, athlete_id, data) values (''videos'', ''v-f2'', ''00000000-0000-0000-0000-0000000000f2'', ''{}'')');
+select t.ok('standard: logs an ascent', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''ascents'', ''a-f2'', ''00000000-0000-0000-0000-0000000000f2'', ''{"grade":"7a"}'')') = 1);
+select t.err('standard: cannot upload a clip', 'insert into storage.objects (bucket_id, name) values (''media'', ''00000000-0000-0000-0000-0000000000f2/clip.mp4'')');
+reset role;
+select t.as('00000000-0000-0000-0000-0000000000f1'); set role authenticated;
+select t.ok('premium: sends a video for analysis', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''videos'', ''v-f1'', ''00000000-0000-0000-0000-0000000000f1'', ''{"notes":[]}'')') = 1);
+select t.ok('premium: uploads the clip into their folder', t.rows('insert into storage.objects (bucket_id, name) values (''media'', ''00000000-0000-0000-0000-0000000000f1/clip.mp4'')') = 1);
+select t.err('cannot upload into another climber folder', 'insert into storage.objects (bucket_id, name) values (''media'', ''00000000-0000-0000-0000-0000000000f2/x.mp4'')');
+select t.err('cannot upload outside a climber folder', 'insert into storage.objects (bucket_id, name) values (''media'', ''loose.mp4'')');
+select t.ok('premium: sees own clip only', (select count(*) from storage.objects) = 1);
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('expired: can still log an ascent', t.rows('insert into athlete_docs (col, id, athlete_id, data) values (''ascents'', ''a-s1'', ' || quote_literal(:S1) || ', ''{}'')') = 1);
+select t.err('expired: no video', 'insert into athlete_docs (col, id, athlete_id, data) values (''videos'', ''v-s1'', ' || quote_literal(:S1) || ', ''{}'')');
+select t.ok('another climber sees no media', (select count(*) from storage.objects) = 0);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('coach comments the video', t.rows('update athlete_docs set data = data || ''{"notes":[{"t":12,"text":"hanche"}]}'' where id = ''v-f1''') = 1);
+select t.ok('coach records a voice note for a standard climber', t.rows('insert into storage.objects (bucket_id, name) values (''media'', ''00000000-0000-0000-0000-0000000000f2/voice.webm'')') = 1);
+select t.ok('coach sees the media of their climbers', (select count(*) from storage.objects) = 2);
+select t.ok('coach reads the logbook', (select count(*) from athlete_docs where col = 'ascents') = 1);
+select t.ok('coach deletes own voice note', t.rows('delete from storage.objects where name like ''%voice.webm''') = 1);
+select t.ok('coach cannot delete the climber clip', t.rows('delete from storage.objects where name like ''%clip.mp4''') = 0);
+reset role;
+select t.as(null);
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

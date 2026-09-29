@@ -803,3 +803,78 @@ main > *{animation:fade-up .22s ease both}
 .rg-lb{display:flex; justify-content:space-between; align-items:baseline; gap:8px}
 .rg-v{font:700 14px var(--mono); color:var(--ink); letter-spacing:0; text-transform:none}
 .rg{width:100%; height:28px; accent-color:var(--accent); cursor:pointer}
+
+/* ---------- retour du coach sur une séance ---------- */
+.rv-card{display:flex; flex-direction:column; gap:8px; padding:12px 14px; border-radius:var(--r-lg);
+  background:var(--accent-wash); border:1px solid var(--accent-line)}
+.rv-text{font-family:var(--serif); font-size:18px; line-height:1.45; white-space:pre-wrap}
+.rv-note{font-size:13.5px; line-height:1.5}
+.rv-audio{width:100%; height:40px}
+.rv-seen{display:flex; align-items:center; gap:6px; font-size:13px; color:var(--good); font-weight:600}
+.rv-seen svg{width:16px; height:16px}
+.rv-form summary{cursor:pointer; font-weight:600; font-size:14px; color:var(--accent); padding:4px 0}
+.rv-form[open] summary{margin-bottom:8px}
+.rv-ex{display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1.4fr); gap:8px; align-items:center; font-size:13px}
+.rv-voice .btn.rec{background:var(--crit); color:#fff; border-color:var(--crit); animation:rv-pulse 1.2s ease-in-out infinite}
+@keyframes rv-pulse{50%{opacity:.7}}
+
+/* ---------- analyse vidéo ---------- */
+.vd-ic{width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:var(--accent-wash); color:var(--accent); flex:none}
+.vd-ic svg{width:18px; height:18px}
+.vd-drop{display:flex; align-items:center; gap:10px; padding:18px; border-radius:var(--r-lg); border:1.5px dashed var(--accent-line);
+  background:var(--surface-2); cursor:pointer; font-weight:600}
+.vd-drop svg{width:22px; height:22px; color:var(--accent)}
+.vd-player video{width:100%; max-height:62vh; border-radius:var(--r-lg); background:#000; display:block}
+.vd-notes{display:flex; flex-direction:column; gap:6px; max-height:32vh; overflow-y:auto}
+.vd-note{display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:baseline; text-align:left; padding:8px 10px;
+  border-radius:var(--r); background:var(--surface-2); border:1px solid var(--line-soft); color:var(--ink); cursor:pointer}
+.vd-note:hover{border-color:var(--accent-line)}
+.vd-note b{font:700 13px var(--mono); color:var(--accent)}
+.vd-note em{font-style:normal; font-size:11.5px; color:var(--ink-3)}
+.vd-add{display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center}
+@media (max-width:480px){ .vd-add{grid-template-columns:auto 1fr} .vd-add .btn{grid-column:1 / -1} }
+
+/* ---------- carnet de croix ---------- */
+.lb-stats{display:grid; grid-template-columns:repeat(4, 1fr); gap:8px}
+.lb-stats > div{display:flex; flex-direction:column; gap:2px; padding:10px; border-radius:var(--r); background:var(--surface-2)}
+.lb-stats b{font:700 20px var(--mono)}
+.lb-stats span{font-size:11px; color:var(--ink-3); text-transform:uppercase; letter-spacing:.05em}
+@media (max-width:560px){ .lb-stats{grid-template-columns:repeat(2, 1fr)} }
+.lb-pyr{display:flex; flex-direction:column; gap:5px}
+.lb-pr{display:grid; grid-template-columns:56px 1fr 28px; gap:8px; align-items:center}
+.lb-g{font:700 13px var(--mono); text-align:right}
+.lb-bar{display:flex; height:16px; border-radius:4px; overflow:hidden; background:var(--surface-3)}
+.lb-bar i, .lb-key i{display:block}
+.lb-n{font:600 12px var(--mono); color:var(--ink-2)}
+.os{background:var(--good)} .fl{background:var(--warn)} .rp{background:var(--accent)}
+.lb-key{display:flex; align-items:center; gap:6px; flex-wrap:wrap}
+.lb-key i{width:10px; height:10px; border-radius:3px; margin-left:8px}
+.lb-months{display:grid; grid-template-columns:repeat(12, 1fr); gap:3px; height:74px; align-items:end}
+.lb-m{position:relative; height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:2px}
+.lb-m i{display:block; width:100%; min-height:6px; border-radius:3px 3px 0 0; background:var(--accent-line); position:relative}
+.lb-m i b{position:absolute; top:-15px; left:50%; transform:translateX(-50%); font:600 9px var(--mono); white-space:nowrap; color:var(--ink-2)}
+.lb-m em{font-style:normal; font-size:10px; color:var(--ink-3)}
+.lb-grade{flex:none; min-width:48px; padding:6px 8px; border-radius:8px; text-align:center; font:700 13px var(--mono);
+  background:var(--accent-wash); color:var(--accent)}
+.lb-grade.boulder{background:color-mix(in srgb, var(--s3) 20%, transparent); color:var(--s3)}
+
+/* ---------- bilan du mois ---------- */
+.rc-teaser{display:flex; align-items:center; gap:14px; padding:14px 16px; text-align:left; width:100%; cursor:pointer; color:var(--ink);
+  background:linear-gradient(120deg, var(--accent-wash), transparent); border:1px solid var(--accent-line)}
+.rc-t-ic{width:44px; height:44px; border-radius:12px; display:grid; place-items:center; background:var(--accent); color:var(--accent-ink); flex:none}
+.rc-teaser .gr{display:flex; flex-direction:column; gap:2px; flex:1}
+.rc-teaser .t1{font-family:var(--serif); font-size:20px; font-weight:600}
+.rc-teaser .t2{font-size:13px; color:var(--ink-2)}
+.rc{display:flex; flex-direction:column; gap:16px; padding:18px; border-radius:var(--r-lg);
+  background:linear-gradient(160deg, #0B1220, #0E3A4A); color:#fff}
+.rc .muted, .rc .small{color:rgba(255,255,255,.7)}
+.rc-head h3{font-family:var(--serif); font-size:34px; font-weight:600; text-transform:capitalize; margin:2px 0}
+.rc-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px}
+.rc-grid > div{display:flex; flex-direction:column; gap:2px; padding:12px; border-radius:14px; background:rgba(255,255,255,.06)}
+.rc-grid b{font:700 26px var(--sans)}
+.rc-grid span{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:rgba(255,255,255,.65)}
+.rc-rec{display:flex; gap:8px; align-items:center; font-weight:600}
+.rc-rec svg{width:16px; height:16px; color:#22D3EE}
+.rc-quote{font-family:var(--serif); font-style:italic; font-size:19px; line-height:1.45; margin:0}
+.rc-quote cite{display:block; font-style:normal; font-family:var(--sans); font-size:13px; color:rgba(255,255,255,.6); margin-top:6px}
+@media (prefers-reduced-motion:reduce){ .rv-voice .btn.rec{animation:none} }

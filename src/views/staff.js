@@ -15,6 +15,9 @@ import { View, initials, isOnline, isStaff, presenceDot } from "./shell.js";
 import { duration } from "./today.js";
 import { hasGear } from "../domain/gear.js";
 import { benchPanel, comparePanel, goalCard, loadsPanel } from "./training.js";
+import { logbookPanel } from "./logbook.js";
+import { toReview } from "./review.js";
+import { toAnalyse, videoPanel } from "./videos.js";
 /* ================================================================
    18. COACH COMMAND CENTER
    ================================================================ */
@@ -130,6 +133,8 @@ function viewAthleteFile(me){
     '</div>' +
 
     goalCard(u, false) +
+    videoPanel(u, false) +
+    logbookPanel(u, false) +
     benchPanel(u, la) +
     comparePanel(u) +
     loadsPanel(u, false) +
@@ -320,6 +325,12 @@ function inboxItems(me){
       out.push({ sev: (p.eva || 0) >= cfg.painAlert ? "crit" : "warn", c, icon: "pain",
         text: t("in.pain", { site: painLabel(p.location), eva: p.eva || 0 }), act: "athlete-go", btn: t("in.open") });
     }
+
+    /* Vidéos envoyées pour analyse, séances faites à commenter. */
+    const vids = toAnalyse(c.id);
+    if (vids.length) out.push({ sev: "msg", c, icon: "video", text: t("in.videos", { n: vids.length }), act: "video-open", v: vids[0].id, btn: t("in.watch") });
+    const rev = toReview(c.id);
+    if (rev.length) out.push({ sev: "msg", c, icon: "check", text: t("in.review", { n: rev.length, title: rev[rev.length - 1].title }), act: "session-open", v: rev[rev.length - 1].id, btn: t("in.comment") });
 
     const mine = sessionsOf(c.id);
     const late = mine.filter(s => s.status === "planned" && diffDays(today(), s.date) > 0 && diffDays(today(), s.date) <= 14).length;

@@ -8,12 +8,12 @@ import { toast } from "./ui/feedback.js";
    Shared artifact database when granted, with a local write-behind
    cache so entries made at the wall survive a dropped connection.
    ================================================================ */
-const COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "prefs", "config", "audit"];
+const COLS = ["users", "assessments", "sessions", "pain", "threads", "routines", "prefs", "videos", "ascents", "config", "audit"];
 const LS_KEY = "altaris.cache.v1";
 const LS_Q   = "altaris.queue.v1";
 /* Collections stockées dans Supabase (table athlete_docs) quand le projet est
    configuré. Les autres restent sur l'appareil pour l'instant. */
-const REMOTE_COLS = ["sessions", "assessments", "pain", "prefs", "routines"];
+const REMOTE_COLS = ["sessions", "assessments", "pain", "prefs", "routines", "videos", "ascents"];
 /* Profil d'entraînement du grimpeur (prefs, un document par grimpeur, id
    "prefs-<id>") : ce que son coach doit voir et qui doit suivre d'un appareil
    à l'autre. Les blessures et douleurs (santé) n'en font pas partie. Le

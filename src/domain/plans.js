@@ -8,11 +8,11 @@ const PLANS = ["trial", "standard", "premium"];
 
 /** Ce que chaque formule ouvre. "train" = démarrer une séance ou un test. */
 const FEATURES = {
-  trial:    { train: true,  fullTests: false, programWeeks: 1, messaging: false, calls: false },
-  standard: { train: true,  fullTests: true,  programWeeks: 4, messaging: false, calls: false },
-  premium:  { train: true,  fullTests: true,  programWeeks: 4, messaging: true,  calls: true  },
-  expired:  { train: false, fullTests: false, programWeeks: 0, messaging: false, calls: false },
-  staff:    { train: true,  fullTests: true,  programWeeks: 4, messaging: true,  calls: true  }
+  trial:    { train: true,  fullTests: false, programWeeks: 1, messaging: false, calls: false, video: false },
+  standard: { train: true,  fullTests: true,  programWeeks: 4, messaging: false, calls: false, video: false },
+  premium:  { train: true,  fullTests: true,  programWeeks: 4, messaging: true,  calls: true,  video: true  },
+  expired:  { train: false, fullTests: false, programWeeks: 0, messaging: false, calls: false, video: false },
+  staff:    { train: true,  fullTests: true,  programWeeks: 4, messaging: true,  calls: true,  video: true  }
 };
 
 /** Formule effective : "staff" pour les encadrants, "expired" une fois l'essai fini. */

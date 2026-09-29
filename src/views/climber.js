@@ -13,6 +13,9 @@ import { calDate, calMode, calToolbar, monthView, yearView } from "./calendar.js
 import { DAYS } from "./onboarding.js";
 import { progressPanel } from "./progress.js";
 import { benchPanel, loadsPanel } from "./training.js";
+import { logbookPanel } from "./logbook.js";
+import { recapLinks } from "./recap.js";
+import { videoPanel } from "./videos.js";
 import { TYPE_COLOR } from "./today.js";
 import { View } from "./shell.js";
 /* ================================================================
@@ -63,7 +66,10 @@ function viewOverview(user){
 
     /* progrès en clair et badges, avant les chiffres techniques */
     progressPanel(u) +
+    logbookPanel(u, true) +
     loadsPanel(u, true) +
+    videoPanel(u, true) +
+    recapLinks(u) +
 
     /* alerts */
     (pains.length ? '<div class="notice ' + (Math.max(...pains.map(x=>x.eva)) >= cfg.painAlert ? "crit" : "warn") + '">' + ic("alert") +

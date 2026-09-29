@@ -1,4 +1,4 @@
-// POST /functions/v1/notify  { kind: "message" | "session" | "done", athleteId, sessionId?, update? }
+// POST /functions/v1/notify  { kind: "message" | "session" | "done" | "review" | "video" | "videoNote", athleteId, sessionId?, videoId?, update? }
 // Called by the app right after a message is sent or a session is saved. The caller's
 // own token proves who they are; the database decides whether they may reach that climber.
 // Content is read from the database, never taken from the request.
@@ -22,8 +22,8 @@ Deno.serve(async (req) => {
   const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: "auth" }, 401);
 
-  const { kind, athleteId, sessionId, update } = await req.json().catch(() => ({}));
-  if (!athleteId || !["message", "session", "done"].includes(kind)) return json({ error: "input" }, 400);
+  const { kind, athleteId, sessionId, videoId, update } = await req.json().catch(() => ({}));
+  if (!athleteId || !["message", "session", "done", "review", "video", "videoNote"].includes(kind)) return json({ error: "input" }, 400);
   const { data: allowed } = await caller.rpc("can_access_athlete", { athlete: athleteId });
   if (!allowed) return json({ error: "forbidden" }, 403);
 
@@ -55,6 +55,33 @@ Deno.serve(async (req) => {
     return json({ sent: await pushTo(admin, toIds, {
       title: T.done(fromName), body: d.title + (d.rpe ? " · " + T.effort(d.rpe) : ""),
       url: SITE + "/?tab=inbox", tag: "done-" + sessionId,
+    }) });
+  }
+
+  // kind === "review": the coach commented a finished session.
+  if (kind === "review"){
+    if (user.id === athleteId || !sessionId) return json({ sent: 0 });
+    const { data: doc } = await admin.from("athlete_docs").select("data").eq("col", "sessions").eq("id", sessionId)
+      .eq("athlete_id", athleteId).maybeSingle();
+    const d = doc?.data as { title: string; review?: { text?: string } } | undefined;
+    if (!d?.review) return json({ sent: 0 });
+    const text = d.review.text || d.title;
+    return json({ sent: await pushTo(admin, toIds, {
+      title: T.review(fromName), body: text.length > 140 ? text.slice(0, 137) + "…" : text,
+      url: SITE + "/?tab=today", tag: "review-" + sessionId,
+    }) });
+  }
+
+  // kind === "video" (climber → coach) / "videoNote" (coach → climber).
+  if (kind === "video" || kind === "videoNote"){
+    if (!videoId || (kind === "video") !== (user.id === athleteId)) return json({ sent: 0 });
+    const { data: doc } = await admin.from("athlete_docs").select("data").eq("col", "videos").eq("id", videoId)
+      .eq("athlete_id", athleteId).maybeSingle();
+    const d = doc?.data as { title?: string } | undefined;
+    if (!d) return json({ sent: 0 });
+    return json({ sent: await pushTo(admin, toIds, {
+      title: kind === "video" ? T.video(fromName) : T.videoNote(fromName), body: d.title || "",
+      url: SITE + (kind === "video" ? "/?tab=inbox" : "/?tab=today"), tag: "video-" + videoId,
     }) });
   }
 

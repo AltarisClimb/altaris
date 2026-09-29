@@ -22,6 +22,8 @@ import { exerciseModal, sendMessage } from "./views/library.js";
 import { DAYS, SESSION_TYPES, fNum, fRange, fSelect, fYear } from "./views/onboarding.js";
 import { saveTemplate, sessionLog } from "./views/training.js";
 import { availGrid, bindAvailGrids } from "./views/availgrid.js";
+import { mountReview, openReview, reviewBlock } from "./views/review.js";
+import { videoNewModal } from "./views/videos.js";
 /* ================================================================
    20. MODALS — session sheet, RPE validation, block editor,
        pain report, availability, profile, account, legal
@@ -54,10 +56,11 @@ function sessionSheet(id){
         kpi(t("ld.session"), fmtNum(s.load), t("ld.au"), t("ld.formula")) + '</div>' +
         (s.feedback ? '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.feedback")) + '</span>' +
           '<p class="small muted" style="line-height:1.6;white-space:pre-wrap">' + esc(s.feedback) + '</p></div>' : '') +
-        sessionLog(s) : '') +
+        sessionLog(s) + reviewBlock(s) : '') +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>' +
       ((s.exercises || []).length && (isCoach || s.userId === me.id) ? '<button class="btn ghost" data-tpl>' + esc(t("tp.save")) + '</button>' : '') +
+      (s.status === "done" && s.userId === me.id ? '<button class="btn ghost" data-vid>' + ic("video") + esc(t("vd.send")) + '</button>' : '') +
       (isCoach ? '<button class="btn" data-edit>' + ic("edit") + esc(t("g.edit")) + '</button>' : '') +
       (s.status !== "done" && !isCoach ? '<button class="btn pri" data-val>' + ic("check") + esc(t("ov.validate")) + '</button>' : '') +
       (s.status === "planned" && isCoach ? '<button class="btn danger" data-miss>' + esc(t("cal.markMissed")) + '</button>' : ''),
@@ -65,6 +68,9 @@ function sessionSheet(id){
       $("[data-c]", root).onclick = () => Modal.close();
       $$("[data-ex]", root).forEach(b => b.onclick = () => exerciseModal(b.dataset.ex));
       const tp = $("[data-tpl]", root); if (tp) tp.onclick = async () => { tp.disabled = true; await saveTemplate(s.id); };
+      const vid = $("[data-vid]", root); if (vid) vid.onclick = () => { Modal.close(); withPlan("video", "vd.why", () => videoNewModal(s.id)); };
+      openReview(s);
+      mountReview(root, s, () => Modal.close());
       const e = $("[data-edit]", root); if (e) e.onclick = () => { Modal.close(); blockEditor(s.userId, s.date, s.id); };
       const v = $("[data-val]", root); if (v) v.onclick = () => { Modal.close(); rpeModal(s.id); };
       const m = $("[data-miss]", root); if (m) m.onclick = async () => {
@@ -507,7 +513,7 @@ function programModal(){
 /* ---------------- formules : comparaison et demande ----------------
    reason (optionnel) : pourquoi on l'affiche (« la messagerie est réservée au Premium »…). */
 const PLAN_ROWS = [["pl.fTests", "fullTests"], ["pl.fProgram", "programWeeks"], ["pl.fLibrary", "train"],
-                   ["pl.fMessaging", "messaging"], ["pl.fCalls", "calls"]];
+                   ["pl.fMessaging", "messaging"], ["pl.fCalls", "calls"], ["pl.fVideo", "video"]];
 function plansModal(reason){
   const me = Session.live(); if (!me) return;
   const cur = planOf(me);

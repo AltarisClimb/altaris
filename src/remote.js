@@ -173,6 +173,29 @@ const Remote = {
     const { error } = await this.client.from("athlete_docs").delete().eq("col", col).eq("id", id);
     if (error) throw error;
   },
+
+  /* ---------- fichiers (bucket privé "media" : vidéos, vocaux) ----------
+     Un dossier par grimpeur ; la RLS de Storage suit celle des documents. */
+  async uploadMedia(athleteId, blob, ext){
+    const path = athleteId + "/" + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)) + "." + ext;
+    const { error } = await this.client.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, upsert: false });
+    if (error) throw error;
+    return path;
+  },
+  _signed: {},
+  /** Lien de lecture temporaire (1 h), gardé 50 min. */
+  async mediaUrl(path){
+    const c = this._signed[path];
+    if (c && c.until > Date.now()) return c.url;
+    const { data, error } = await this.client.storage.from("media").createSignedUrl(path, 3600);
+    if (error) throw error;
+    this._signed[path] = { url: data.signedUrl, until: Date.now() + 50 * 60000 };
+    return data.signedUrl;
+  },
+  async deleteMedia(path){
+    const { error } = await this.client.storage.from("media").remove([path]);
+    if (error) throw error;
+  },
   /** Changements en direct (Realtime applique la même RLS).
    *  onDoc(col, id, row|null) pour athlete_docs, onMessage(row) pour chaque nouveau message. */
   watch(onDoc, onMessage){

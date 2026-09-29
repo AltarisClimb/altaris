@@ -19,6 +19,9 @@ import { sessionsOf } from "./climber.js";
 import { callCard } from "./calls.js";
 import { getThread } from "./library.js";
 import { canTrainFree, goalCard, retestCard } from "./training.js";
+import { recapTeaser } from "./recap.js";
+import { unreadReview } from "./review.js";
+import { unreadVideo } from "./videos.js";
 
 /** Couleur d'un type de séance (bande des cartes, pastilles). */
 const TYPE_COLOR = { boulder: "var(--s1)", lead: "var(--s2)", fingerboard: "var(--s6)", strength: "var(--s3)",
@@ -114,6 +117,8 @@ function viewToday(me){
         '<span class="in-what">' + esc(fmtDate(s.date, { weekday: "long", day: "numeric", month: "long" })) + ' · ' + esc(t("ov.toValidate")) + '</span></span>' +
         '<button class="btn sm pri" data-act="validate" data-v="' + esc(s.id) + '">' + esc(t("ov.validate")) + '</button></div>').join("") + '</div>' : '') +
 
+    feedbackCards(me) +
+    recapTeaser(me) +
     (plan !== "expired" ? retestCard(me) : '') +
     goalCard(me, true) +
     '<div class="td-stats">' +
@@ -136,10 +141,22 @@ function viewToday(me){
 
     '<div class="row tight noprint">' +
       (canTrainFree(me) ? '<button class="btn sm" data-act="free-session">' + ic("timer") + esc(t("fs.title")) + '</button>' : '') +
+      '<button class="btn sm" data-act="ascent-new">' + ic("target") + esc(t("lb.add")) + '</button>' +
       '<button class="btn sm ghost" data-act="pain-new">' + ic("pain") + esc(t("ov.reportPain")) + '</button>' +
       '<button class="btn sm ghost" data-act="tab" data-v="tests">' + ic("test") + esc(t("nav.tests")) + '</button>' +
     '</div>' +
   '</div>';
+}
+
+/** Retours du coach pas encore lus : séance commentée, vidéo annotée. */
+function feedbackCards(me){
+  const rv = unreadReview(me.id), vd = unreadVideo(me.id);
+  const row = (icon, who, what, act, v) => '<div class="in-row msg"><span class="in-ic">' + ic(icon) + '</span>' +
+    '<span class="in-main"><span class="in-who">' + esc(who) + '</span><span class="in-what">' + esc(what) + '</span></span>' +
+    '<button class="btn sm pri" data-act="' + act + '" data-v="' + esc(v) + '">' + esc(t("rv.open")) + '</button></div>';
+  const rows = (rv ? row("chat", t("rv.newT", { name: (rv.review.name || "").split(" ")[0] }), rv.title, "session-open", rv.id) : '') +
+    (vd ? row("video", t("vd.newT"), vd.title || t("vd.untitled"), "video-open", vd.id) : '');
+  return rows ? '<div class="panel in-list">' + rows + '</div>' : '';
 }
 
 export { TYPE_COLOR, duration, viewToday };

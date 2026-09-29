@@ -19,6 +19,9 @@ import { rangeText } from "./views/onboarding.js";
 import { playerActions, startPlayer, stopPlayer } from "./views/player.js";
 import { closeHang, hangActions, hangSets, openHang } from "./views/hang.js";
 import { freeSessionModal, gearModal, goalModal } from "./views/training.js";
+import { videoModal, videoNewModal } from "./views/videos.js";
+import { ascentModal } from "./views/logbook.js";
+import { recapModal } from "./views/recap.js";
 import { sessionsOf } from "./views/climber.js";
 import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
@@ -121,6 +124,12 @@ const ACTIONS = {
     stopPlayer(); View.tab = "today"; window.scrollTo(0,0); render();
   },
   "goal-edit": () => goalModal(),
+  /* Analyse vidéo (Premium), carnet de croix, bilan du mois. */
+  "video-new": () => withPlan("video", "vd.why", () => videoNewModal(null)),
+  "video-open": (v) => videoModal(v),
+  "ascent-new": () => ascentModal(null),
+  "ascent-edit": (v) => ascentModal(v),
+  recap: (v) => recapModal(v),
   "gear-edit": () => gearModal(),
   /* Séance libre : minuteur de suspension, échauffement express, modèles. */
   "free-session": () => withPlan("train", "pl.whyTrain", () => freeSessionModal((o) => {
