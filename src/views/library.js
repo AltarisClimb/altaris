@@ -17,6 +17,7 @@ import { painLabel } from "./climber.js";
 import { callCard } from "./calls.js";
 import { View, isStaff, presenceDot, presenceText } from "./shell.js";
 import { gearSection, goalCard } from "./training.js";
+import { networkSection, whereLine } from "./network.js";
 /* ================================================================
    15. EXERCISE BANK
    ================================================================ */
@@ -245,65 +246,6 @@ async function markRead(th, userId){
   await Store.put("threads", th.id, Object.assign({}, th, { read }));
 }
 
-function viewMessages(me){
-  /* Messagerie avec le coach : réservée au Premium (le serveur l'impose aussi). */
-  if (me.role === "climber" && !can(me, "messaging")) return lockedView("pl.lockMsgT", "pl.lockMsgD", "chat");
-  const partners = me.role === "climber"
-    ? (Access.myCoach() ? [Access.myCoach()] : [])
-    : Access.climbers();
-  if (!partners.length){
-    return '<div class="stack lg"><div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ms.title")) + '</span>' +
-      '<h2>' + esc(t("ms.noThread")) + '</h2></div></div>' +
-      '<div class="panel"><div class="empty">' + ic("chat") + '<div class="t">' + esc(t("ms.noThread")) + '</div>' +
-      '<div class="d">' + esc(me.role === "climber" ? t("ms.noCoach") : t("co.noAthletesD")) + '</div></div></div></div>';
-  }
-  const other = View.thread ? (byId(partners, View.thread) || partners[0]) : partners[0];
-  const th = getThread(me.id, other.id);
-  setTimeout(() => markRead(getThread(me.id, other.id), me.id), 0);
-  const msgs = (th.messages || []).slice().sort((a,b) => a.ts - b.ts);
-
-  return '<div class="stack lg">' +
-    '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("ms.title")) + '</span>' +
-      '<h2 class="pr-h">' + presenceDot(other) + esc(other.name) + '</h2><p>' + esc(t("role."+other.role)) +
-        (presenceText(other) ? ' · ' + esc(presenceText(other)) : '') + '</p></div>' +
-      /* Coach : ses créneaux de visio (Premium). */
-      (isStaff(me) && Remote.client ? '<button class="btn sm noprint" data-act="call-slots">' + ic("video") + esc(t("vc.slots")) + '</button>' : '') +
-    '</div>' +
-    callCard(me) +
-    (partners.length > 1 ? '<div class="row tight noprint">' + partners.map(x => {
-      const u = getThread(me.id, x.id);
-      const n = (u.messages||[]).filter(m => m.from !== me.id && m.ts > ((u.read||{})[me.id]||0)).length;
-      return '<button class="filt' + (x.id === other.id ? " on" : "") + '" data-act="thread" data-v="' + esc(x.id) + '">' +
-        presenceDot(x) + esc(x.name) + (n ? '<span class="n">' + n + '</span>' : '') + '</button>';
-    }).join("") + '</div>' : '') +
-
-    '<div class="panel pad stack">' +
-      (msgs.length ? '<div class="thread">' + msgs.map(m => {
-        const mine = m.from === me.id;
-        const who = Store.get("users", m.from);
-        return '<div class="msg ' + (mine ? "me" : "them") + '">' +
-          (mine ? '' : '<div class="who">' + esc(who ? who.name : "—") + '</div>') +
-          (m.ctx ? '<div class="chip acc" style="margin-bottom:5px">' + esc(t("ms.context")) + ' : ' + esc(m.ctx) + '</div>' : '') +
-          '<div>' + esc(m.text).replace(/\n/g, "<br>") + '</div>' +
-          (m.videoUrl ? '<a class="vid" href="' + esc(m.videoUrl) + '" target="_blank" rel="noopener noreferrer">' + ic("video") + esc(t("ex.video")) + '</a>' : '') +
-          '<div class="tm">' + esc(fmtTime(m.ts)) + '</div></div>';
-      }).join("") + '</div>'
-        : '<div class="empty">' + ic("chat") + '<div class="t">' + esc(t("ms.noThread")) + '</div></div>') +
-      topo() +
-      '<div class="stack sm noprint">' +
-        '<textarea class="inp" data-fk="msg" data-act-input="msg" placeholder="' + esc(t("ms.placeholder")) + '">' + esc(View.msgDraft||"") + '</textarea>' +
-        '<div class="row tight">' +
-          '<span class="unit" style="flex:1 1 240px"><input class="inp" data-fk="msgv" id="msg-video" placeholder="' + esc(t("ms.videoLink")) + '">' +
-            '<span class="u">' + ic("video") + '</span></span>' +
-          '<button class="btn sm ghost" data-act="video-check">' + ic("video") + esc(t("ms.attachVideo")) + '</button>' +
-          '<button class="btn sm pri" data-act="msg-send" data-v="' + esc(other.id) + '">' + ic("send") + esc(t("g.send")) + '</button>' +
-        '</div>' +
-        '<p class="dim tiny">' + esc(t("ms.videoLimit")) + ' · ' + esc(t("ms.videoNote")) + '</p>' +
-      '</div>' +
-    '</div>' +
-  '</div>';
-}
-
 /* ================================================================
    17. PROFILE + PAIN JOURNAL
    ================================================================ */
@@ -368,6 +310,7 @@ function viewProfile(me){
           rw(t("on.mainDisc"), t("on.disc." + (p.discipline || "both"))) +
           rw(t("pf.track"), track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) +
           rw(t("pf.coach"), coach ? coach.name : t("g.unassigned")) +
+          (coach && whereLine(coach) ? rw(t("nw.coachWhere"), whereLine(coach)) : '') +
           rw(t("pf.retest"), la ? fmtDate(addDays(la.date, cfg.retestDays), {day:"2-digit",month:"short",year:"numeric"}) : t("ov.doTest")) +
         '</div></div>' +
     '</div>' : '') +
@@ -384,8 +327,18 @@ function viewProfile(me){
       '</div>';
     })() : '') +
 
+    /* Carte bancaire : enregistrée chez Stripe (portail sécurisé), jamais dans l'application. */
+    (me.role === "climber" && Remote.client ? '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("pay.title")) + '</span>' +
+      '<p class="small muted">' + esc(t("pay.d")) + '</p>' +
+      '<div class="row tight noprint"><button class="btn sm" data-act="billing-portal">' + ic("lock") + esc(t("pay.manage")) + '</button></div></div>' : '') +
+
+    networkSection(me) +
     notifSection() +
     emailSection(me) +
+
+    '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("lx.title")) + '</span>' +
+      '<p class="small muted">' + esc(t("lx.intro")) + '</p>' +
+      '<div class="row tight noprint"><button class="btn sm" data-act="term" data-v="">' + ic("book") + esc(t("lx.open")) + '</button></div></div>' +
 
     /* Consentement santé (RGPD art. 9) : état, et le donner ou le retirer à tout moment. */
     (me.role === "climber" && Remote.client ? '<div class="panel pad stack sm">' +
@@ -421,7 +374,7 @@ function rw(k, v){
     '<span class="v">' + esc(v) + '</span></div>';
 }
 
-export { exerciseModal, getThread, lockedView, markRead, rw, sendMessage, threadId, unreadCount, viewExercises, viewMessages, viewProfile };
+export { exerciseModal, getThread, lockedView, markRead, rw, sendMessage, threadId, unreadCount, viewExercises, viewProfile };
 
 /** Écran d'une fonction non incluse dans la formule, avec l'accès à la comparaison. */
 function lockedView(titleKey, textKey, icon){

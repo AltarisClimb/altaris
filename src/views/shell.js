@@ -19,6 +19,9 @@ const View = {
   calFor: null,           // whose calendar a coach is looking at
   acwrMethod: null,
   thread: null,
+  threadOpen: false,      // téléphone : fil ouvert (sinon la liste des conversations)
+  emojiOpen: false,
+  msgAttach: false,
   onb: null,              // onboarding wizard state
   runner: null,           // test runner state
   msgDraft: "",

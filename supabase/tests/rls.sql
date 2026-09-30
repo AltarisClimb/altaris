@@ -401,7 +401,28 @@ reset role;
 select t.as(null);
 select t.ok('the payment webhook (service) sets billing fields', t.rows('update profiles set stripe_customer_id = ''cus_1'', subscription_status = ''active'', plan = ''standard'' where id = ' || quote_literal(:S1)) = 1);
 
+-- ================= network: declared region, languages, reciprocal directory
+select t.as(:T1); set role authenticated;
+select t.ok('a coach declares region, languages and joins the directory', t.rows('update profiles set region = ''Occitanie'', languages = ''{fr,en}'', directory_optin = true where id = ' || quote_literal(:T1)) = 1);
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('outside the directory, a climber sees nobody in it', (select count(*) from directory()) = 0);
+select t.ok('a climber joins the directory', t.rows('update profiles set region = ''Occitanie'', directory_optin = true where id = ' || quote_literal(:S1)) = 1);
+select t.ok('once in, they see the coach who opted in, not themselves', (select count(*) from directory()) = 1 and (select count(*) from directory() where id = :T1 and languages = '{fr,en}') = 1);
+select t.ok('the directory does not open the profiles table', (select count(*) from profiles where id = :T1) = 0);
+reset role;
+select t.as(:S2); set role authenticated;
+select t.ok('a climber who did not opt in is not listed and sees nothing', (select count(*) from directory()) = 0);
+reset role;
+select t.as(:T1); set role authenticated;
+select t.ok('the coach sees the climber who opted in, only them', (select count(*) from directory()) = 1);
+reset role;
+select t.as(null);
+
 -- ================= anon
+select t.as(null); set role anon;
+select t.err('anon cannot use the directory', 'select count(*) from directory()');
+reset role;
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');
 select t.err('anon cannot read sessions', 'select count(*) from athlete_docs');

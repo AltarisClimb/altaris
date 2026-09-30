@@ -1,5 +1,6 @@
 // POST /functions/v1/billing-portal  → { url }
-// Stripe's customer portal: change plan, update the card, download invoices, cancel.
+// Stripe's customer portal: save or update the card, change plan, download invoices, cancel.
+// The card lives at Stripe only; the app never sees or stores it.
 // Secrets: STRIPE_SECRET_KEY, SITE_URL.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { cors } from "../_shared/push.ts";
@@ -20,8 +21,15 @@ Deno.serve(async (req) => {
   });
   const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: "auth" }, 401);
-  const { data: prof } = await admin.from("profiles").select("stripe_customer_id").eq("id", user.id).single();
-  if (!prof?.stripe_customer_id) return json({ error: "no customer" }, 404);
-  const s = await stripe(secret, "POST", "billing_portal/sessions", { customer: prof.stripe_customer_id, return_url: SITE + "/?tab=profile" });
+  const { data: prof } = await admin.from("profiles").select("email, full_name, role, stripe_customer_id").eq("id", user.id).single();
+  if (!prof || prof.role !== "student") return json({ error: "forbidden" }, 403);
+  // No customer yet (never subscribed): create it, so a card can be saved ahead of a first payment.
+  let customer = prof.stripe_customer_id;
+  if (!customer) {
+    const c = await stripe(secret, "POST", "customers", { email: prof.email, name: prof.full_name || undefined, metadata: { user_id: user.id } });
+    customer = c.id;
+    await admin.from("profiles").update({ stripe_customer_id: customer }).eq("id", user.id);
+  }
+  const s = await stripe(secret, "POST", "billing_portal/sessions", { customer, return_url: SITE + "/?tab=profile" });
   return json({ url: s.url });
 });

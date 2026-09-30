@@ -10,7 +10,7 @@
    PRECACHE lists every module. It is generated from the source tree —
    if you add a file under src/, add it here too or it will be missing
    offline. Bump VERSION on every release so clients refresh the cache. */
-const VERSION = "altaris-v1.26.0";
+const VERSION = "altaris-v1.27.0";
 const SHELL = VERSION + "-shell";
 const FONTS = VERSION + "-fonts";
 const PRECACHE = [
@@ -41,6 +41,7 @@ const PRECACHE = [
   "./src/domain/plans.js",
   "./src/domain/program.js",
   "./src/domain/progress.js",
+  "./src/domain/network.js",
   "./src/domain/recap.js",
   "./src/domain/scoring.js",
   "./src/domain/signature.js",
@@ -84,7 +85,11 @@ const PRECACHE = [
   "./src/views/testing.js",
   "./src/views/today.js",
   "./src/views/training.js",
-  "./src/views/videos.js"
+  "./src/views/videos.js",
+  "./src/views/agenda.js",
+  "./src/views/messages.js",
+  "./src/views/network.js",
+  "./src/ui/glossary.js"
 ];
 
 self.addEventListener("install", (e) => {

@@ -137,20 +137,67 @@ function drawRecap(u, r){
 }
 function roundRect(x, a, b, w, h, r){ x.beginPath(); x.moveTo(a + r, b); x.arcTo(a + w, b, a + w, b + h, r); x.arcTo(a + w, b + h, a, b + h, r); x.arcTo(a, b + h, a, b, r); x.arcTo(a, b, a + w, b, r); x.closePath(); }
 
+/** Image d'une séance faite (1080 × 1350) : titre, date, durée, effort, mot du coach. Aucune donnée de santé. */
+function drawSession(u, s){
+  const W = 1080, H = 1350, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  const g = x.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#0B1220"); g.addColorStop(1, "#0E3A4A");
+  x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.strokeStyle = "rgba(34,211,238,.08)"; x.lineWidth = 2;
+  for (let i = 0; i < 9; i++){ x.beginPath(); x.ellipse(W * .82, H * .18, 120 + i * 70, 80 + i * 52, -.4, 0, Math.PI * 2); x.stroke(); }
+  const sans = '"Barlow", "Segoe UI", system-ui, sans-serif', serif = '"Cormorant Garamond", Georgia, serif';
+  x.fillStyle = "#22D3EE"; x.font = "700 34px " + sans; x.fillText("ALTARIS", 80, 120);
+  x.fillStyle = "rgba(255,255,255,.72)"; x.font = "500 36px " + sans;
+  const day = new Date(s.date + "T12:00:00").toLocaleDateString(LOC(), { weekday: "long", day: "numeric", month: "long" });
+  x.fillText(day.charAt(0).toUpperCase() + day.slice(1), 80, 210);
+  x.fillStyle = "#FFFFFF"; x.font = "600 84px " + serif;
+  let y = 310;
+  wrap(x, s.title || t("st." + s.type), W - 160).slice(0, 3).forEach(l => { x.fillText(l, 80, y); y += 92; });
+  y += 40;
+  const tiles = [[duration(s.actualMin || s.plannedMin || 0), t("sh.duration")],
+                 [s.rpe ? s.rpe + "/10" : "—", t("pl.effort")],
+                 [t("st." + s.type), t("sh.type")],
+                 [String((s.exercises || []).length || "—"), t("sh.exercises")]];
+  tiles.forEach(([v, l], i) => {
+    const cx = 80 + (i % 2) * 470, cy = y + 90 + Math.floor(i / 2) * 190;
+    x.fillStyle = "rgba(255,255,255,.06)"; roundRect(x, cx, cy - 90, 440, 160, 26); x.fill();
+    x.fillStyle = "#FFFFFF"; x.font = "700 " + (String(v).length > 9 ? 46 : 64) + "px " + sans; x.fillText(String(v), cx + 32, cy + 2);
+    x.fillStyle = "rgba(255,255,255,.65)"; x.font = "500 28px " + sans; x.fillText(l.toUpperCase(), cx + 32, cy + 46);
+  });
+  y += 2 * 190 + 60;
+  const word = s.review && s.review.text ? s.review.text : "";
+  if (word && y < H - 260){
+    x.fillStyle = "rgba(255,255,255,.9)"; x.font = "italic 500 40px " + serif;
+    wrap(x, "« " + (word.length > 160 ? word.slice(0, 157) + "…" : word) + " »", W - 160).slice(0, 3).forEach(l => { x.fillText(l, 80, y); y += 52; });
+  }
+  x.fillStyle = "rgba(255,255,255,.72)"; x.font = "500 32px " + sans; x.fillText((u.name || "").split(" ")[0], 80, H - 120);
+  x.fillStyle = "rgba(255,255,255,.5)"; x.font = "500 26px " + sans; x.fillText("altaris-climb.com", 80, H - 70);
+  return c;
+}
+/** Partager une séance : feuille de partage du téléphone (Instagram, WhatsApp…), image téléchargée ailleurs. */
+async function shareSession(u, s){
+  try{ await document.fonts.ready; }catch(e){}
+  return shareCanvas(drawSession(u, s), "altaris-" + s.date + ".png", s.title || "ALTARIS", t("sh.saved"));
+}
+
 async function shareImage(u, r){
   try{ await document.fonts.ready; }catch(e){}
-  const canvas = drawRecap(u, r);
+  return shareCanvas(drawRecap(u, r), "altaris-" + r.month + ".png", t("rc.yourMonth", { m: monthName(r.month) }), t("rc.saved"));
+}
+async function shareCanvas(canvas, name, title, savedText){
   const blob = await new Promise(res => canvas.toBlob(res, "image/png"));
-  const file = new File([blob], "altaris-" + r.month + ".png", { type: "image/png" });
+  const file = new File([blob], name, { type: "image/png" });
   if (navigator.canShare && navigator.canShare({ files: [file] })){
-    try{ await navigator.share({ files: [file], title: t("rc.yourMonth", { m: monthName(r.month) }) }); return; }
+    try{ await navigator.share({ files: [file], title }); return; }
     catch(e){ if (e && e.name === "AbortError") return; }
   }
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob); a.download = file.name;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  toast(t("rc.saved"), "good");
+  toast(savedText, "good");
 }
 
-export { drawRecap, recapLinks, recapModal, recapTeaser };
+export { drawRecap, drawSession, recapLinks, recapModal, recapTeaser, shareSession };

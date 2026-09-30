@@ -18,6 +18,8 @@ import { benchPanel, comparePanel, goalCard, loadsPanel } from "./training.js";
 import { logbookPanel } from "./logbook.js";
 import { toReview } from "./review.js";
 import { toAnalyse, videoPanel } from "./videos.js";
+import { viewAgenda } from "./agenda.js";
+import { whereLine } from "./network.js";
 /* ================================================================
    18. COACH COMMAND CENTER
    ================================================================ */
@@ -91,6 +93,7 @@ function viewAthleteFile(me){
       '<h2>' + esc(u.name) + '</h2>' +
       '<p>' + esc(track === "advanced" ? t("on.routeAdv") : t("on.routeBeg")) + ' · ' + esc(gradePair(p, LANG === "en")) +
       (p.weightKg ? ' · ' + p.weightKg + ' kg' : '') + (p.heightCm ? ' · ' + p.heightCm + ' cm' : '') + '</p>' +
+      (whereLine(u) ? '<p class="small muted">' + esc(whereLine(u)) + '</p>' : '') +
       (hasGear(p.gear) && p.gear.items.length ? '<p class="small muted">' + esc(t("gr.title")) + ' : ' +
         esc(p.gear.items.map(k => t("gr." + k)).join(", ")) + ((p.gear.edges || []).length ? ' · ' + esc(p.gear.edges.join("/")) + ' mm' : '') + '</p>' : '') + '</div>' +
       '<div class="row tight noprint">' +
@@ -161,11 +164,14 @@ function viewAthleteFile(me){
 function viewPlanning(me){
   const list = Access.climbers();
   if (!list.length) return viewFleet(me);
-  const target = View.calFor ? (byId(list, View.calFor) || list[0]) : list[0];
+  /* D'abord l'agenda du coach (tous ses grimpeurs, ses disponibilités), puis le calendrier de chacun. */
+  const target = View.calFor ? byId(list, View.calFor) : null;
   return '<div class="stack lg">' +
-    '<div class="row tight noprint">' + list.map(c =>
-      '<button class="filt' + (c.id === target.id ? " on" : "") + '" data-act="cal-for" data-v="' + esc(c.id) + '">' + esc(c.name) + '</button>').join("") + '</div>' +
-    viewCalendar(target, true) + '</div>';
+    '<div class="row tight noprint">' +
+      '<button class="filt' + (target ? "" : " on") + '" data-act="cal-for" data-v="">' + ic("cal") + esc(t("ag.title")) + '</button>' +
+      list.map(c =>
+      '<button class="filt' + (target && c.id === target.id ? " on" : "") + '" data-act="cal-for" data-v="' + esc(c.id) + '">' + esc(c.name) + '</button>').join("") + '</div>' +
+    (target ? viewCalendar(target, true) : viewAgenda(me)) + '</div>';
 }
 
 /* ================================================================
@@ -231,11 +237,11 @@ function viewPairings(){
     (climbers.length ? '<div class="panel"><div class="tw"><table class="dt"><thead><tr>' +
       '<th>' + esc(t("role.climber")) + '</th><th>' + esc(t("pf.level")) + '</th><th>' + esc(t("ad.assignCoach")) + '</th></tr></thead><tbody>' +
       climbers.map(c => '<tr><td><span class="row tight nowrap"><span class="avatar sm">' + esc(initials(c.name)) + '</span>' +
-        '<span style="font-weight:600">' + esc(c.name) + '</span></span></td>' +
+        '<span style="font-weight:600">' + esc(c.name) + (whereLine(c) ? '<br><span class="dim tiny" style="font-weight:400">' + esc(whereLine(c)) + '</span>' : '') + '</span></span></td>' +
         '<td><span class="chip">' + esc(gradePair(c.profile, LANG === "en")) + '</span></td>' +
         '<td><select class="inp" style="min-height:36px;max-width:260px" data-act-change="pair" data-v="' + esc(c.id) + '">' +
           '<option value="">' + esc(t("g.unassigned")) + '</option>' +
-          coaches.map(k => '<option value="' + esc(k.id) + '"' + (c.coachId === k.id ? " selected" : "") + '>' + esc(k.name) + '</option>').join("") +
+          coaches.map(k => '<option value="' + esc(k.id) + '"' + (c.coachId === k.id ? " selected" : "") + '>' + esc(k.name + (whereLine(k) ? " — " + whereLine(k) : "")) + '</option>').join("") +
         '</select></td></tr>').join("") + '</tbody></table></div></div>'
       : '<div class="panel"><div class="empty">' + ic("users") + '<div class="t">' + esc(t("g.noData")) + '</div></div></div>') +
   '</div>';

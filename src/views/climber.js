@@ -9,6 +9,7 @@ import { acwrZone, computeACWR, monotonyStrain } from "../domain/workload.js";
 import { LANG, LI, fmtDate, fmtNum, relDays, t } from "../i18n/index.js";
 import { acwrGauge, acwrSeries, radarChart, typeBars, workloadChart } from "../ui/charts.js";
 import { ic } from "../ui/icons.js";
+import { info } from "../ui/glossary.js";
 import { calDate, calMode, calToolbar, monthView, yearView } from "./calendar.js";
 import { DAYS } from "./onboarding.js";
 import { progressPanel } from "./progress.js";
@@ -80,7 +81,7 @@ function viewOverview(user){
     /* load strip */
     '<div class="g-load">' +
       '<div class="panel pad stack sm" style="align-content:start">' +
-        '<div class="between"><span class="eyebrow">' + esc(t("ov.acwr")) + '</span>' +
+        '<div class="between"><span class="eyebrow">' + esc(t("ov.acwr")) + info("acwr") + '</span>' +
           '<div class="seg sm"><button data-act="acwr-m" data-v="ra" class="' + ((View.acwrMethod||cfg.acwrMethod)==="ra"?"on":"") + '">' + esc(t("ld.ra")) + '</button>' +
           '<button data-act="acwr-m" data-v="ewma" class="' + ((View.acwrMethod||cfg.acwrMethod)==="ewma"?"on":"") + '">' + esc(t("ld.ewma")) + '</button></div></div>' +
         acwrGauge(a.ratio) +
@@ -89,10 +90,10 @@ function viewOverview(user){
                            ' · ' + esc(t("ld.chronic")) + ' ' + fmtNum(a.chronic) + '</p>') +
       '</div>' +
       '<div class="grid g2" style="align-content:start">' +
-        kpi(t("ov.weekLoad"), fmtNum(ms.weekly), t("ld.au"), t("ld.formula")) +
+        kpi(t("ov.weekLoad"), fmtNum(ms.weekly), t("ld.au"), t("ld.formula"), "", "load") +
         kpi(t("ov.monotony"), ms.monotony == null ? "—" : ms.monotony.toFixed(2), "", t("ld.monotonyD"),
-            ms.monotony != null && ms.monotony > cfg.monoHigh ? "warn" : "") +
-        kpi(t("ov.strain"), ms.strain == null ? "—" : fmtNum(ms.strain), t("ld.au"), t("ld.strainD")) +
+            ms.monotony != null && ms.monotony > cfg.monoHigh ? "warn" : "", "monotony") +
+        kpi(t("ov.strain"), ms.strain == null ? "—" : fmtNum(ms.strain), t("ld.au"), t("ld.strainD"), "", "strain") +
         kpi(t("ov.lastTest"), la ? relDays(la.date) : "—", "", la ? t("ts."+(la.battery==="advanced"?"batteryAdv":"batteryBeg")) : t("ts.noTests"),
             (!la || diffDays(today(), la.date) > cfg.testValidityDays) ? "warn" : "") +
       '</div>' +
@@ -158,8 +159,9 @@ function viewOverview(user){
   '</div>';
 }
 
-function kpi(k, v, unit, sub, cls){
-  return '<div class="kpi ' + (cls||"") + '"><span class="k">' + esc(k) + '</span>' +
+/** term (facultatif) : entrée du lexique, ouverte par le « ? » à côté du libellé. */
+function kpi(k, v, unit, sub, cls, term){
+  return '<div class="kpi ' + (cls||"") + '"><span class="k">' + esc(k) + (term ? info(term) : '') + '</span>' +
     '<span class="v">' + esc(v) + (unit ? '<small>' + esc(unit) + '</small>' : '') + '</span>' +
     (sub ? '<span class="s">' + esc(sub) + '</span>' : '') + '</div>';
 }

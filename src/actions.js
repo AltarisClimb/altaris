@@ -1,3 +1,6 @@
+import { growInput } from "./views/messages.js";
+import { networkModal } from "./views/network.js";
+import { openTerm } from "./ui/glossary.js";
 import { $, $$, addDays, clamp, esc, today, uid, weekStart } from "./core.js";
 import { Access, Session, Store, audit, can, config } from "./data.js";
 import { buildICS, upcomingForAgenda } from "./domain/calendar.js";
@@ -195,8 +198,24 @@ const ACTIONS = {
   "cal-for": (v) => { View.calFor = v; render(); },
   "inbox-for": (v) => { View.inboxFor = v || null; render(); },
   "plan-athlete": (v) => { View.calFor = v; View.tab = "planning"; View.athlete = null; window.scrollTo(0,0); render(); },
-  thread: (v) => { View.thread = v; render(); },
-  "thread-go": (v) => { View.thread = v; View.tab = "messages"; View.athlete = null; render(); },
+  thread: (v) => { View.thread = v; View.threadOpen = true; View.msgDraft = ""; View.emojiOpen = false; render(); },
+  "thread-back": () => { View.threadOpen = false; render(); },
+  "thread-go": (v) => { View.thread = v; View.threadOpen = true; View.tab = "messages"; View.athlete = null; render(); },
+  "emoji-toggle": () => { View.emojiOpen = !View.emojiOpen; render(); },
+  "msg-attach": () => { View.msgAttach = !View.msgAttach; render(); },
+  emoji: (v) => {
+    View.msgDraft = (View.msgDraft || "") + v;
+    render();
+    /* Ordinateur : on reprend la saisie ; téléphone : le clavier masquerait le panneau. */
+    const ta = $('[data-fk="msg"]');
+    if (ta && window.innerWidth > 760){ ta.focus(); try{ ta.setSelectionRange(ta.value.length, ta.value.length); }catch(e){} }
+  },
+  term: (v) => openTerm(v),
+  "network-edit": () => networkModal(),
+  "billing-portal": async () => {
+    try{ location.href = await Remote.billingPortal(); }catch(e){ toast(t("pl.portalFailed"), "crit"); }
+  },
+  "agenda-day": (v) => { View.calDate = v; View.calMode = "week"; window.scrollTo(0, 0); render(); },
   "session-open": (v) => sessionSheet(v),
   validate: (v) => withPlan("train", "pl.whyTrain", () => rpeModal(v)),
   "block-new": (v, el) => blockEditor(v, el.dataset.d || null, null),
@@ -228,7 +247,7 @@ const ACTIONS = {
     const url = ($("#msg-video") && $("#msg-video").value.trim()) || "";
     if (!text && !url) return;
     if (!await sendMessage(me.id, v, { text: text || t("ex.video"), videoUrl: url || null })) return;   // brouillon conservé
-    View.msgDraft = "";
+    View.msgDraft = ""; View.emojiOpen = false; View.msgAttach = false;
     render();
     audit("message_sent", v);
   },
@@ -330,6 +349,14 @@ document.addEventListener("click", (e) => {
     render();
   }
 });
+/* Messagerie : Entrée envoie (Maj+Entrée = retour à la ligne) ; sur téléphone, Entrée reste un retour à la ligne. */
+document.addEventListener("keydown", (e) => {
+  const el = e.target.closest ? e.target.closest("[data-enter]") : null;
+  if (!el || e.key !== "Enter" || e.shiftKey || e.isComposing || window.innerWidth <= 760) return;
+  e.preventDefault();
+  const fn = ACTIONS[el.dataset.enter];
+  if (fn) fn(el.dataset.v, el);
+});
 /* Formulaires : Entrée soumet, sans rechargement de page. */
 document.addEventListener("submit", (e) => {
   const f = e.target.closest("form[data-act-submit]");
@@ -342,7 +369,7 @@ document.addEventListener("input", (e) => {
   const el = e.target.closest("[data-act-input]");
   if (el){
     if (el.dataset.actInput === "ex-q"){ View.exFilter.q = el.value; renderDebounced(); }
-    if (el.dataset.actInput === "msg"){ View.msgDraft = el.value; }
+    if (el.dataset.actInput === "msg"){ View.msgDraft = el.value; growInput(el); }
     if (el.dataset.actInput === "pl-dur" && View.player){ View.player.durInput = el.value; }
     if (el.dataset.actInput === "pl-fb" && View.player){ View.player.fb = el.value; }
     return;

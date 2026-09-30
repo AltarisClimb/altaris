@@ -980,3 +980,138 @@ main > *{animation:fade-up .22s ease both}
 .in-row.msg{max-width:none; border-radius:0; padding:11px 14px; font-size:inherit; line-height:inherit}
 .in-stat.msg{max-width:none; padding:14px; border-radius:14px; font-size:inherit; line-height:inherit}
 .in-badge.msg{max-width:none; padding:0 6px; border-radius:999px; font-size:12px; line-height:1}
+
+/* Messagerie : liste des conversations + fil, à la manière d'une messagerie instantanée */
+.wa{display:grid; grid-template-columns:300px minmax(0,1fr); height:min(70vh, 720px); min-height:420px;
+  border:1px solid var(--line); border-radius:16px; overflow:hidden; background:var(--surface)}
+.wa.solo{grid-template-columns:minmax(0,1fr)}
+.wa-list{overflow-y:auto; border-right:1px solid var(--line); background:var(--surface-2)}
+.wa-conv{display:flex; align-items:center; gap:10px; width:100%; padding:11px 12px; text-align:left; color:var(--ink);
+  border-bottom:1px solid var(--line-soft)}
+.wa-conv:hover{background:var(--surface-3)}
+.wa-conv.on{background:var(--accent-wash)}
+.wa-conv-main{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1}
+.wa-conv-top{display:flex; align-items:baseline; gap:8px}
+.wa-conv-top b{flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px}
+.wa-conv-when{font:500 10.5px/1 var(--mono); color:var(--ink-3); flex:none}
+.wa-conv-last{font-size:12.5px; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.wa-chat{display:flex; flex-direction:column; min-width:0; min-height:0}
+.wa-head{display:flex; align-items:center; gap:10px; padding:10px 12px; border-bottom:1px solid var(--line); flex:none}
+.wa-who{display:flex; flex-direction:column; min-width:0; flex:1}
+.wa-who b{font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.wa-who span{font-size:12px; color:var(--ink-2)}
+.wa-back{display:none}
+.wa-thread{flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:3px; padding:14px;
+  background:radial-gradient(circle at 20% 10%, var(--accent-wash), transparent 55%), var(--bg)}
+.wa-thread .empty{margin:auto}
+.wa-thread .msg{max-width:min(78%, 560px); padding:7px 11px 5px; margin-top:7px; border-radius:16px; box-shadow:0 1px 1px rgba(0,0,0,.12)}
+.wa-thread .msg.follow{margin-top:0}
+.wa-thread .msg.me{border-bottom-right-radius:5px}
+.wa-thread .msg.them{border-bottom-left-radius:5px}
+.wa-thread .msg .tm{text-align:right; margin-top:1px}
+.wa-thread .msg.big{background:none; border-color:transparent; box-shadow:none; padding:0 4px}
+.wa-thread .msg.big .tx{font-size:42px; line-height:1.15}
+.wa-day{display:flex; justify-content:center; margin:10px 0 2px}
+.wa-day span{font-size:11.5px; font-weight:600; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line-soft);
+  padding:3px 10px; border-radius:999px}
+.wa-compose{flex:none; border-top:1px solid var(--line); background:var(--surface); padding:8px 10px; display:flex; flex-direction:column; gap:8px}
+.wa-bar{display:flex; align-items:flex-end; gap:6px}
+.wa-input{flex:1; min-height:42px; max-height:140px; resize:none; border-radius:21px; padding:10px 14px; line-height:1.35; overflow-y:auto}
+.wa-tool{width:42px; height:42px; border-radius:50%; display:grid; place-items:center; flex:none; font-size:21px; color:var(--ink-2)}
+.wa-tool:hover, .wa-tool.on{background:var(--surface-2); color:var(--accent)}
+.wa-tool svg{width:20px; height:20px}
+.wa-send{width:42px; height:42px; min-height:42px; padding:0; border-radius:50%; flex:none; display:grid; place-items:center}
+.wa-send svg{margin:0}
+.wa-emoji{display:grid; grid-template-columns:repeat(auto-fill, minmax(40px, 1fr)); gap:2px; max-height:150px; overflow-y:auto}
+.wa-emoji button{font-size:24px; height:40px; border-radius:10px}
+.wa-emoji button:hover{background:var(--surface-2)}
+@media (max-width:760px){
+  .wa{grid-template-columns:minmax(0,1fr); height:calc(100dvh - 210px)}
+  .wa:not(.solo):not(.open) .wa-chat{display:none}
+  .wa.open .wa-list{display:none}
+  .wa-list{border-right:none}
+  .wa:not(.solo) .wa-back{display:inline-grid}
+  .wa-lbl{display:none}
+}
+
+/* Agenda du coach : semaine (grille) et mois */
+.ag-wrap{padding:8px; overflow-x:auto}
+.ag-grid{display:grid; grid-template-columns:44px repeat(7, minmax(84px, 1fr)); gap:2px; max-height:64vh; overflow-y:auto; user-select:none; min-width:640px}
+.ag-dh{position:sticky; top:0; z-index:2; background:var(--surface); display:flex; flex-direction:column; align-items:center; padding:4px 0 6px;
+  font:600 10px/1.2 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3)}
+.ag-dh b{font:600 16px/1.2 var(--sans); color:var(--ink); letter-spacing:0}
+.ag-dh.today b{color:var(--accent-ink); background:var(--accent); border-radius:999px; min-width:26px; text-align:center}
+.ag-h{font:500 10px/1 var(--mono); color:var(--ink-3); text-align:right; padding-right:6px; transform:translateY(-4px)}
+.ag-h:first-child{position:sticky; top:0; z-index:2; background:var(--surface); transform:none}
+.ag-allh{transform:none; align-self:center}
+.ag-all{display:flex; flex-direction:column; gap:2px; min-height:26px; padding:2px; border-radius:6px; background:var(--surface-2)}
+.ag-c{min-height:26px; border-radius:5px; background:var(--surface-2); border:1px solid transparent; display:flex; align-items:center; gap:2px;
+  padding:1px 2px; cursor:pointer; overflow:hidden}
+.ag-c:hover:not([data-off]){border-color:var(--accent)}
+.ag-c.open{background:var(--accent-wash); border-color:var(--accent-line); box-shadow:inset 3px 0 0 var(--accent)}
+.ag-c.booked{background:var(--good-wash); box-shadow:inset 3px 0 0 var(--good)}
+.ag-c.past{opacity:.45}
+.ag-c[data-off]{cursor:default}
+.ag-c.pend-add{background:var(--accent-line)}
+.ag-c.pend-del{background:var(--crit-wash); border-color:var(--crit)}
+.ag-visio{display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700; color:var(--good); white-space:nowrap}
+.ag-visio svg{width:11px; height:11px}
+.ag-ev{display:inline-flex; align-items:center; gap:4px; min-width:0; max-width:100%; height:20px; padding:0 6px 0 0; border-radius:5px;
+  background:var(--surface); border:1px solid var(--line); font-size:10.5px; color:var(--ink); overflow:hidden; flex:0 1 auto}
+.ag-ev b{background:var(--c); color:#06121a; font-size:9.5px; padding:0 4px; height:100%; display:grid; place-items:center; flex:none}
+.ag-ev span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.ag-ev.done{opacity:.6} .ag-ev.missed b{background:var(--crit)}
+.ag-ev:hover{border-color:var(--c)}
+.ag-legend{display:flex; flex-wrap:wrap; gap:6px 16px}
+.ag-legend span{display:inline-flex; align-items:center; gap:6px}
+.ag-key{display:inline-block; width:14px; height:14px; border-radius:4px; background:var(--surface-2); border:1px solid var(--line)}
+.ag-key.open{background:var(--accent-wash); box-shadow:inset 3px 0 0 var(--accent)}
+.ag-key.booked{background:var(--good-wash); box-shadow:inset 3px 0 0 var(--good)}
+.ag-key.ev{background:var(--s1)}
+.ag-help{gap:12px; flex-wrap:wrap}
+.ag-help p{flex:1 1 320px; margin:0}
+.am-grid{display:grid; grid-template-columns:repeat(7, minmax(0,1fr)); gap:4px}
+.am-h{font:600 10px/1.2 var(--sans); letter-spacing:.1em; text-transform:uppercase; color:var(--ink-3); text-align:center; padding-bottom:4px}
+.am-d{display:flex; flex-direction:column; align-items:flex-start; gap:4px; min-height:84px; padding:6px; border-radius:10px; text-align:left;
+  background:var(--surface-2); border:1px solid transparent; color:var(--ink); overflow:hidden}
+.am-d:hover{border-color:var(--accent)}
+.am-d.out{opacity:.35}
+.am-d.today .am-n{background:var(--accent); color:var(--accent-ink); border-radius:999px; padding:0 7px}
+.am-n{font:600 13px/1.5 var(--sans)}
+.am-av{display:flex; flex-wrap:wrap; gap:2px}
+.am-av i{font:700 9px/16px var(--sans); font-style:normal; min-width:20px; text-align:center; padding:0 3px; border-radius:4px; background:var(--c); color:#06121a}
+.am-av i.more{background:var(--surface-3); color:var(--ink-2)}
+.am-tag{display:inline-flex; align-items:center; gap:3px; font-size:10.5px; font-weight:700; padding:1px 6px; border-radius:999px; white-space:nowrap}
+.am-tag.open{background:var(--accent-wash); color:var(--accent)}
+.am-tag.booked{background:var(--good-wash); color:var(--good)}
+.am-tag svg{width:11px; height:11px}
+@media (max-width:560px){ .am-d{min-height:64px; padding:4px} .am-tag{font-size:9.5px; padding:1px 4px} }
+
+/* Lexique : « ? » à côté d'un terme, fiche par-dessus l'écran */
+.gl-i{display:inline-grid; place-items:center; width:18px; height:18px; margin-left:6px; border-radius:50%; vertical-align:middle;
+  font:700 11px/1 var(--sans); letter-spacing:0; text-transform:none; color:var(--accent); background:var(--accent-wash);
+  border:1px solid var(--accent-line); cursor:pointer; position:relative}
+.gl-i::after{content:""; position:absolute; inset:-10px}
+.gl-i:hover{background:var(--accent); color:var(--accent-ink)}
+.gl-pop{position:fixed; inset:0; z-index:1200; display:grid; place-items:center; padding:16px; background:rgba(2,6,14,.62)}
+.gl-card{width:min(520px, 100%); max-height:82vh; display:flex; flex-direction:column; gap:12px; padding:18px; border-radius:18px;
+  background:var(--surface); border:1px solid var(--line); box-shadow:0 24px 60px rgba(0,0,0,.45)}
+.gl-head{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.gl-body{overflow-y:auto; display:flex; flex-direction:column; gap:16px}
+.gl-term b{font-size:17px; color:var(--ink)}
+.gl-term p{margin:6px 0 0; font-size:14px; line-height:1.6; color:var(--ink-2)}
+.gl-term .gl-ex{font-size:13px; color:var(--ink); background:var(--surface-2); border-left:3px solid var(--accent); padding:8px 10px; border-radius:0 8px 8px 0}
+@media (max-width:560px){ .gl-pop{place-items:end center; padding:0} .gl-card{border-radius:18px 18px 0 0; width:100%} }
+
+/* Réseau */
+.nw-k{font-size:11px; letter-spacing:.08em; text-transform:uppercase}
+.nw-list{display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:8px}
+.nw-p{display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:12px; background:var(--surface-2)}
+.nw-main{display:flex; flex-direction:column; min-width:0; flex:1}
+.nw-main b{font-size:14px}
+.nw-main span{font-size:12px; color:var(--ink-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.nw-opt{display:flex; align-items:flex-start; gap:10px; cursor:pointer}
+.nw-opt input{margin-top:4px}
+.filt svg{width:14px; height:14px; flex:none}
+.filt{white-space:nowrap}
+textarea.inp.wa-input{min-height:42px; resize:none}

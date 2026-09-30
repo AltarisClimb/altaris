@@ -7,7 +7,9 @@ import { Remote } from "./remote.js";
 import { toast } from "./ui/feedback.js";
 import { viewAuth, viewSetPassword } from "./views/auth.js";
 import { viewCalendar, viewOverview } from "./views/climber.js";
-import { viewExercises, viewMessages, viewProfile } from "./views/library.js";
+import { viewExercises, viewProfile } from "./views/library.js";
+import { bindMessages, viewMessages } from "./views/messages.js";
+import { bindAgenda } from "./views/agenda.js";
 import { viewOnboarding } from "./views/onboarding.js";
 import { TABS, View, legalFooter, tabAllowed, tabsBar, topbar, watermark } from "./views/shell.js";
 import { viewAdmin, viewAthleteFile, viewFleet, viewInbox, viewPlanning } from "./views/staff.js";
@@ -79,6 +81,8 @@ function render(){
   bindHang();
   bindAvailGrids(app);
   bindCallTimer();
+  bindMessages();
+  bindAgenda(Session.live());
 }
 
 /* Le bus relie la couche de données au rendu sans créer de cycle. */

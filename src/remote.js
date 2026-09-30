@@ -48,7 +48,10 @@ function fromProfile(p){
     plan: p.plan || "trial",
     trialEndsAt: p.trial_ends_at ? Date.parse(p.trial_ends_at) : null,
     subscriptionStatus: p.subscription_status || null,
-    weeklyEmail: p.weekly_email !== false
+    weeklyEmail: p.weekly_email !== false,
+    region: p.region || null,
+    languages: Array.isArray(p.languages) ? p.languages : [],
+    directoryOptin: !!p.directory_optin
   };
 }
 
@@ -60,6 +63,9 @@ function profilePatch(before, after){
   if (before.status !== after.status) patch.status = after.status;
   if (after.plan && before.plan !== after.plan) patch.plan = after.plan;
   if (after.weeklyEmail !== undefined && before.weeklyEmail !== after.weeklyEmail) patch.weekly_email = !!after.weeklyEmail;
+  if (after.region !== undefined && (before.region || null) !== (after.region || null)) patch.region = after.region || null;
+  if (after.languages !== undefined && (before.languages || []).join() !== (after.languages || []).join()) patch.languages = after.languages || [];
+  if (after.directoryOptin !== undefined && !!before.directoryOptin !== !!after.directoryOptin) patch.directory_optin = !!after.directoryOptin;
   if ((before.trialEndsAt || null) !== (after.trialEndsAt || null))
     patch.trial_ends_at = after.trialEndsAt ? new Date(after.trialEndsAt).toISOString() : null;
   if ((before.coachId || null) !== (after.coachId || null) || patch.role){
@@ -123,12 +129,25 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const base = "id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at";
-    let { data, error } = await this.client.from("profiles").select(base + ", subscription_status, weekly_email");
-    /* Colonnes d'abonnement absentes (migration pas encore appliquée) : on ne bloque
-       pas la connexion pour autant, on relit sans elles. */
-    if (error && error.code === "42703") ({ data, error } = await this.client.from("profiles").select(base));
+    /* Colonnes récentes absentes (migration pas encore appliquée) : on ne bloque pas
+       la connexion pour autant, on relit avec un jeu de colonnes plus ancien. */
+    const sets = [base + ", subscription_status, weekly_email, region, languages, directory_optin",
+                  base + ", subscription_status, weekly_email", base];
+    let data, error;
+    for (const cols of sets){
+      ({ data, error } = await this.client.from("profiles").select(cols));
+      this.networkReady = !error && cols === sets[0];
+      if (!error || error.code !== "42703") break;
+    }
     if (error) throw error;
     return data.map(fromProfile);
+  },
+  networkReady: false,
+  /** Annuaire réciproque (fonction directory()) : personnes inscrites, si je le suis aussi. */
+  async directory(){
+    const { data, error } = await this.client.rpc("directory");
+    if (error) throw error;
+    return (data || []).map(r => ({ id: r.id, name: r.name, role: ROLE_IN[r.role] || "climber", region: r.region, languages: r.languages || [] }));
   },
 
   /** Exercices visibles (RLS) : free pour tous, library pour coachs/admins,
@@ -307,6 +326,7 @@ const Remote = {
     if (error || !data || !data.url) throw error || new Error("checkout unavailable");
     return data.url;
   },
+  /** Portail Stripe : carte enregistrée, factures, formule. Le compte client Stripe est créé au besoin. */
   async billingPortal(){
     const { data, error } = await this.client.functions.invoke("billing-portal", { body: {} });
     if (error || !data || !data.url) throw error || new Error("portal unavailable");

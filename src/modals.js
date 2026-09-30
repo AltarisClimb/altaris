@@ -26,6 +26,8 @@ import { revertAdaptation } from "./domain/adapt.js";
 import { availGrid, bindAvailGrids } from "./views/availgrid.js";
 import { mountReview, openReview, reviewBlock } from "./views/review.js";
 import { videoNewModal } from "./views/videos.js";
+import { shareSession } from "./views/recap.js";
+import { info } from "./ui/glossary.js";
 /* ================================================================
    20. MODALS — session sheet, RPE validation, block editor,
        pain report, availability, profile, account, legal
@@ -54,15 +56,16 @@ function sessionSheet(id){
           '<span class="gr"><span class="t1">' + esc(exName(e)) + '</span><span class="t2">' + esc(exField(e,"dose")) + '</span></span>' +
           ic("chevR","chev") + '</button>').join("") + '</div></div>' : '') +
       (s.status === "done" ? '<div class="grid g3">' +
-        kpi("RPE", String(s.rpe), "/10", t("rpe.scale")) +
+        kpi("RPE", String(s.rpe), "/10", t("rpe.scale"), "", "rpe") +
         kpi(t("rpe.realDur"), String(s.actualMin), t("g.min"), "") +
-        kpi(t("ld.session"), fmtNum(s.load), t("ld.au"), t("ld.formula")) + '</div>' +
+        kpi(t("ld.session"), fmtNum(s.load), t("ld.au"), t("ld.formula"), "", "load") + '</div>' +
         (s.feedback ? '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.feedback")) + '</span>' +
           '<p class="small muted" style="line-height:1.6;white-space:pre-wrap">' + esc(s.feedback) + '</p></div>' : '') +
         sessionLog(s) + reviewBlock(s) : '') +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>' +
       ((s.exercises || []).length && (isCoach || s.userId === me.id) ? '<button class="btn ghost" data-tpl>' + esc(t("tp.save")) + '</button>' : '') +
+      (s.status === "done" && s.userId === me.id ? '<button class="btn ghost" data-share>' + ic("send") + esc(t("sh.share")) + '</button>' : '') +
       (s.status === "done" && s.userId === me.id ? '<button class="btn ghost" data-vid>' + ic("video") + esc(t("vd.send")) + '</button>' : '') +
       (isCoach ? '<button class="btn" data-edit>' + ic("edit") + esc(t("g.edit")) + '</button>' : '') +
       (s.status !== "done" && !isCoach ? '<button class="btn pri" data-val>' + ic("check") + esc(t("ov.validate")) + '</button>' : '') +
@@ -71,6 +74,7 @@ function sessionSheet(id){
       $("[data-c]", root).onclick = () => Modal.close();
       $$("[data-ex]", root).forEach(b => b.onclick = () => exerciseModal(b.dataset.ex));
       const tp = $("[data-tpl]", root); if (tp) tp.onclick = async () => { tp.disabled = true; await saveTemplate(s.id); };
+      const sh = $("[data-share]", root); if (sh) sh.onclick = () => shareSession(me, s).catch(() => toast(t("rc.shareFailed"), "crit"));
       const vid = $("[data-vid]", root); if (vid) vid.onclick = () => { Modal.close(); withPlan("video", "vd.why", () => videoNewModal(s.id)); };
       openReview(s);
       const undo = $("[data-adapt-undo]", root);
@@ -101,7 +105,7 @@ function rpeModal(id){
       (exs.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.exercises")) + '</span>' +
         '<div class="grid g2">' + exs.map(e => '<label class="check on" data-exchk="' + esc(e.id) + '">' +
           '<input type="checkbox" checked><span class="t">' + esc(exName(e)) + '</span></label>').join("") + '</div></div>' : '') +
-      '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.q")) + '</span>' +
+      '<div class="stack sm"><span class="eyebrow">' + esc(t("rpe.q")) + info("rpe") + '</span>' +
         '<div class="rpe" id="rpe-grid">' + [1,2,3,4,5,6,7,8,9,10].map(i =>
           '<button data-rpe="' + i + '" class="' + (rpe===i?"on":"") + '">' + i + '</button>').join("") + '</div>' +
         '<div class="rpe-lb"><span>' + esc(t("rpe.1")) + '</span><span>' + esc(t("rpe.10")) + '</span></div>' +
