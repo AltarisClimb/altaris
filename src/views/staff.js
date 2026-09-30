@@ -355,38 +355,90 @@ function inboxItems(me){
 /** Pastille de l'onglet : ce qui est urgent (tout sauf l'informatif). */
 function inboxCount(me){ return inboxItems(me).filter(x => x.sev !== "info").length; }
 
+/** Couleur d'un grimpeur d'après ce qui l'attend : rouge, orange, bleu (à répondre), vert. */
+function inboxStatus(list){
+  return list.some(x => x.sev === "crit") ? "crit" : list.some(x => x.sev === "warn") ? "warn" : list.some(x => x.sev === "msg") ? "msg" : "good";
+}
+
 function viewInbox(me){
-  const items = inboxItems(me);
+  const all = inboxItems(me);
+  const climbers = Access.climbers().slice().sort((a, b) => a.name.localeCompare(b.name));
+  const sel = View.inboxFor && byId(climbers, View.inboxFor) ? View.inboxFor : null;
+  const of = (id) => all.filter(x => x.c.id === id);
+  const items = sel ? of(sel) : all;
   const urgent = items.filter(x => x.sev !== "info");
   const later = items.filter(x => x.sev === "info");
-  const row = (x) =>
+  const scope = sel ? [byId(climbers, sel)] : climbers;
+  const week = scope.map(c => weekProgress(sessionsOf(c.id)));
+  const done = sum(week.map(w => w.done)), total = sum(week.map(w => w.total));
+  const n = (sev) => items.filter(x => x.sev === sev).length;
+
+  const row = (x, named) =>
     '<div class="in-row ' + x.sev + '">' +
       '<span class="in-ic">' + ic(x.icon) + '</span>' +
-      '<span class="in-main"><span class="in-who">' + esc(x.c.name) + '</span>' +
-        '<span class="in-what">' + esc(x.text) + '</span></span>' +
+      '<span class="in-main">' + (named ? '<span class="in-who">' + esc(x.c.name) + '</span>' : '') +
+        '<span class="in-what' + (named ? '' : ' solo') + '">' + esc(x.text) + '</span></span>' +
       '<button class="btn sm' + (x.sev === "info" ? ' ghost' : '') + '" data-act="' + x.act + '" data-v="' + esc(x.v || x.c.id) + '">' + esc(x.btn) + '</button>' +
     '</div>';
+  /* Un indicateur : une icône, un chiffre, une phrase courte. */
+  const stat = (cls, icon, value, label, extra) =>
+    '<div class="in-stat ' + cls + '"><span class="in-stat-ic">' + ic(icon) + '</span>' +
+      '<span class="in-stat-main"><b>' + value + '</b><span>' + esc(label) + '</span>' + (extra || '') + '</span></div>';
+  const pick = (id, label, list, avatar) => {
+    const st = inboxStatus(list), count = list.filter(x => x.sev !== "info").length;
+    return '<button class="in-pick' + ((id || null) === sel ? ' on' : '') + '" data-act="inbox-for" data-v="' + esc(id) + '" aria-pressed="' + ((id || null) === sel) + '">' +
+      avatar + '<span class="in-pick-name">' + esc(label) + '</span>' +
+      (count ? '<span class="in-badge ' + st + '">' + count + '</span>' : '<span class="fl-dot good" title="' + esc(t("in.upToDate")) + '"></span>') +
+    '</button>';
+  };
+  /* Tous les grimpeurs : une carte par grimpeur, les plus urgents d'abord. */
+  const groups = () => climbers.map(c => ({ c, list: of(c.id).filter(x => x.sev !== "info") })).filter(g => g.list.length)
+    .sort((a, b) => SEV_ORDER[a.list[0].sev] - SEV_ORDER[b.list[0].sev] || a.c.name.localeCompare(b.c.name))
+    .map(g => '<div class="panel in-list"><button class="in-group" data-act="inbox-for" data-v="' + esc(g.c.id) + '">' +
+        '<span class="avatar sm">' + esc(initials(g.c.name)) + '</span><b>' + esc(g.c.name) + '</b>' +
+        '<span class="in-badge ' + inboxStatus(g.list) + '">' + g.list.length + '</span></button>' +
+      g.list.map(x => row(x, false)).join("") + '</div>').join("");
+  /* Éléments hors grimpeurs suivis (ex. demande de formule d'un compte sans coach). */
+  const others = sel ? [] : urgent.filter(x => !byId(climbers, x.c.id));
+
+  if (!climbers.length && !all.length) return '<div class="stack lg">' +
+    '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("in.eyebrow")) + '</span><h2>' + esc(t("in.title")) + '</h2></div></div>' +
+    '<div class="panel"><div class="empty">' + ic("users") + '<div class="t">' + esc(t("co.noAthletes")) + '</div>' +
+      '<div class="d">' + esc(t("co.noAthletesD")) + '</div></div></div></div>';
 
   return '<div class="stack lg">' +
     '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("in.eyebrow")) + '</span>' +
       '<h2>' + esc(t("in.title")) + '</h2>' +
       '<p>' + esc(urgent.length ? t("in.summary", { n: urgent.length }) : t("in.allClear")) + '</p></div></div>' +
 
-    (!Access.climbers().length
-      ? '<div class="panel"><div class="empty">' + ic("users") + '<div class="t">' + esc(t("co.noAthletes")) + '</div>' +
-        '<div class="d">' + esc(t("co.noAthletesD")) + '</div></div></div>'
-      : (urgent.length ? '<div class="panel in-list">' + urgent.map(row).join("") + '</div>'
-         : '<div class="panel"><div class="empty">' + ic("check") + '<div class="t">' + esc(t("in.allClear")) + '</div>' +
-           '<div class="d">' + esc(t("in.allClearD")) + '</div></div></div>') +
-        (later.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("in.later")) + '</span>' +
-          '<div class="panel in-list">' + later.map(row).join("") + '</div></div>' : '') +
-        recentFeed()) +
+    '<div class="in-picks noprint" role="group" aria-label="' + esc(t("in.pick")) + '">' +
+      pick("", t("in.everyone"), all, '<span class="avatar sm">' + ic("users") + '</span>') +
+      climbers.map(c => pick(c.id, c.name.split(" ")[0], of(c.id),
+        '<span class="av-wrap"><span class="avatar sm">' + esc(initials(c.name)) + '</span>' + presenceDot(c) + '</span>')).join("") +
+    '</div>' +
+
+    '<div class="in-stats">' +
+      stat(n("crit") ? "crit" : "good", "pain", n("crit"), t("in.stUrgent")) +
+      stat(n("msg") ? "msg" : "good", "chat", n("msg"), t("in.stReply")) +
+      stat(n("warn") ? "warn" : "good", "trend", n("warn"), t("in.stWatch")) +
+      stat("week", "check", done + '<small> / ' + total + '</small>', t("in.stWeek"),
+        '<span class="in-bar"><i style="width:' + (total ? Math.round(done / total * 100) : 0) + '%"></i></span>') +
+    '</div>' +
+
+    (urgent.length
+      ? (sel ? '<div class="panel in-list">' + urgent.map(x => row(x, false)).join("") + '</div>'
+             : (others.length ? '<div class="panel in-list">' + others.map(x => row(x, true)).join("") + '</div>' : '') + groups())
+      : '<div class="panel"><div class="empty">' + ic("check") + '<div class="t">' + esc(t("in.allClear")) + '</div>' +
+        '<div class="d">' + esc(t("in.allClearD")) + '</div></div></div>') +
+    (later.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("in.later")) + '</span>' +
+      '<div class="panel in-list">' + later.map(x => row(x, !sel)).join("") + '</div></div>' : '') +
+    recentFeed(sel) +
   '</div>';
 }
 
 /** Dernières séances validées par les grimpeurs (7 jours) : de quoi féliciter. */
-function recentFeed(){
-  const feed = Access.climbers()
+function recentFeed(only){
+  const feed = Access.climbers().filter(c => !only || c.id === only)
     .flatMap(c => sessionsOf(c.id).filter(s => s.status === "done" && diffDays(today(), s.date) <= 7).map(s => ({ s, c })))
     .sort((a, b) => (b.s.doneAt || 0) - (a.s.doneAt || 0) || (a.s.date < b.s.date ? 1 : -1))
     .slice(0, 8);

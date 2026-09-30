@@ -196,8 +196,6 @@ function planningGrid(user){
   const days = []; for (let i = 0; i < 7; i++) days.push(addDays(ws, i));
   const all = sessionsOf(u.id);
   const inWeek = all.filter(s => days.indexOf(s.date) >= 0);
-  const plannedLoad = sum(inWeek.filter(s => s.status !== "done").map(s => (s.plannedMin||0) * (s.targetIntensity||5)));
-  const actualLoad  = sum(inWeek.filter(s => s.status === "done").map(s => s.load||0));
   const avail = p.availability || [];
 
   const head = '<div class="sec-head"><div><span class="eyebrow acc">' + esc(t("cal.title")) + '</span>' +
@@ -217,13 +215,7 @@ function planningGrid(user){
 
   return '<div class="stack lg">' + head +
 
-    '<div class="grid g4">' +
-      kpi(t("cal.plannedLoad"), fmtNum(plannedLoad), t("ld.au"), t("ld.formula")) +
-      kpi(t("cal.actualLoad"), fmtNum(actualLoad), t("ld.au"), inWeek.filter(s=>s.status==="done").length + " / " + inWeek.length) +
-      kpi(t("ov.acwr"), (function(){ const r = computeACWR(u.id).ratio; return r == null ? "—" : r.toFixed(2); })(), "",
-          t(acwrZone(computeACWR(u.id).ratio).key), acwrZone(computeACWR(u.id).ratio).cls) +
-      kpi(t("cal.myAvail"), String(avail.length), "", t("cal.editAvail")) +
-    '</div>' +
+    '<p class="dim small">' + esc(t("cal.weekDone", { done: inWeek.filter(s => s.status === "done").length, total: inWeek.length })) + '</p>' +
 
     (asCoach ? '<div class="notice">' + ic("info") + '<span>' + esc(t("cal.dragHint")) + '</span></div>' : '') +
 
@@ -242,7 +234,7 @@ function planningGrid(user){
               return '<button class="blk ' + cls + '" data-act="session-open" data-v="' + esc(s.id) + '" style="--type:' + (TYPE_COLOR[s.type] || 'var(--accent)') + '"' +
                 (asCoach ? ' draggable="true" data-drag="' + esc(s.id) + '"' : '') + '>' +
                 '<span class="bt">' + esc(s.title) + '</span>' +
-                '<span class="bm">' + (s.status === "done" ? "RPE " + s.rpe + " · " + fmtNum(s.load)
+                '<span class="bm">' + (s.status === "done" ? "RPE " + s.rpe + " · " + (s.actualMin || s.plannedMin || 0) + "′"
                   : (sessionStart(s, p) ? sessionStart(s, p) + " · " : "") + (s.plannedMin||0) + "′ · I" + (s.targetIntensity||5)) + '</span></button>';
             }).join("") +
             (asCoach ? '<button class="btn xs ghost" style="margin-top:auto;opacity:.6" data-act="block-new" data-v="' + esc(u.id) + '" data-d="' + d + '">' + ic("plus") + '</button>' : '') +

@@ -193,6 +193,7 @@ const ACTIONS = {
   "athlete-go": (v) => { View.tab = "athletes"; View.athlete = v || null; window.scrollTo(0,0); render(); },
   "admin-tab": (v) => { View.adminTab = v; window.scrollTo(0,0); render(); },
   "cal-for": (v) => { View.calFor = v; render(); },
+  "inbox-for": (v) => { View.inboxFor = v || null; render(); },
   "plan-athlete": (v) => { View.calFor = v; View.tab = "planning"; View.athlete = null; window.scrollTo(0,0); render(); },
   thread: (v) => { View.thread = v; render(); },
   "thread-go": (v) => { View.thread = v; View.tab = "messages"; View.athlete = null; render(); },

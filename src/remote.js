@@ -122,8 +122,11 @@ const Remote = {
 
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
-    const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at, subscription_status, weekly_email");
+    const base = "id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at";
+    let { data, error } = await this.client.from("profiles").select(base + ", subscription_status, weekly_email");
+    /* Colonnes d'abonnement absentes (migration pas encore appliquée) : on ne bloque
+       pas la connexion pour autant, on relit sans elles. */
+    if (error && error.code === "42703") ({ data, error } = await this.client.from("profiles").select(base));
     if (error) throw error;
     return data.map(fromProfile);
   },

@@ -15,6 +15,7 @@ const View = {
   exFilter: { cat:"all", lv:"all", q:"" },
   calMode: "week",            // calendrier : "day" | "week" | "month" | "year"
   calDate: null,              // date de référence (null = aujourd'hui)
+  inboxFor: null,         // « À traiter » : grimpeur choisi (null = tous)
   calFor: null,           // whose calendar a coach is looking at
   acwrMethod: null,
   thread: null,
