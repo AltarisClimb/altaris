@@ -1102,5 +1102,9 @@ export default {
   "em.on": "Chaque lundi matin : votre semaine passée, votre série et les séances prévues.",
   "em.off": "Récapitulatif hebdomadaire désactivé.",
   "em.disable": "Ne plus le recevoir",
-  "em.enable": "Le recevoir"
+  "em.enable": "Le recevoir",
+  "pl.period.month": "Mensuel",
+  "pl.period.year": "Annuel · 2 mois offerts",
+  "pl.perMonth": " / mois",
+  "pl.perYear": " / an"
 };

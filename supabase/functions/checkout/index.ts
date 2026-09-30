@@ -1,7 +1,8 @@
-// POST /functions/v1/checkout  { plan: "standard" | "premium" }  → { url }
+// POST /functions/v1/checkout  { plan: "standard" | "premium", period: "month" | "year" }  → { url }
 // Opens a Stripe Checkout page for the signed-in climber. The plan itself is only
 // changed by the stripe-webhook function once Stripe confirms the payment.
-// Secrets: STRIPE_SECRET_KEY, STRIPE_PRICE_STANDARD, STRIPE_PRICE_PREMIUM, SITE_URL.
+// Secrets: STRIPE_SECRET_KEY, STRIPE_PRICE_STANDARD, STRIPE_PRICE_PREMIUM (monthly),
+// STRIPE_PRICE_STANDARD_YEAR, STRIPE_PRICE_PREMIUM_YEAR (yearly, optional), SITE_URL.
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { cors } from "../_shared/push.ts";
 import { stripe } from "../_shared/stripe.js";
@@ -23,8 +24,9 @@ Deno.serve(async (req) => {
   const { data: { user } } = await caller.auth.getUser();
   if (!user) return json({ error: "auth" }, 401);
 
-  const { plan } = await req.json().catch(() => ({}));
-  const price = plan === "premium" ? Deno.env.get("STRIPE_PRICE_PREMIUM") : plan === "standard" ? Deno.env.get("STRIPE_PRICE_STANDARD") : null;
+  const { plan, period } = await req.json().catch(() => ({}));
+  if (plan !== "standard" && plan !== "premium") return json({ error: "plan" }, 400);
+  const price = Deno.env.get("STRIPE_PRICE_" + plan.toUpperCase() + (period === "year" ? "_YEAR" : ""));
   if (!price) return json({ error: "plan" }, 400);
 
   const { data: prof } = await admin.from("profiles").select("email, full_name, role, stripe_customer_id").eq("id", user.id).single();

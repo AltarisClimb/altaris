@@ -252,8 +252,8 @@ factures, changement de formule, résiliation) et `stripe-webhook` (seule à
 changer la formule d'un grimpeur, d'après Stripe). Sans elles, le bouton
 « S'abonner » envoie une demande à l'admin comme avant.
 
-1. Dans Stripe : créer un produit par formule (Standard, Premium) avec un prix
-   mensuel récurrent ; noter les deux identifiants `price_…`. Activer le
+1. Dans Stripe : créer un produit par formule (Standard, Premium), chacun avec
+   un prix mensuel et un prix annuel récurrents ; noter les quatre identifiants `price_…`. Activer le
    portail client (Settings → Billing → Customer portal).
 2. Webhook (Developers → Webhooks) vers
    `https://bunfdvzedeosliwylbzn.supabase.co/functions/v1/stripe-webhook`,
@@ -264,14 +264,15 @@ changer la formule d'un grimpeur, d'après Stripe). Sans elles, le bouton
 
 ```bash
 npx supabase secrets set STRIPE_SECRET_KEY=<sk_…> STRIPE_WEBHOOK_SECRET=<whsec_…> \
-  STRIPE_PRICE_STANDARD=<price_…> STRIPE_PRICE_PREMIUM=<price_…>
+  STRIPE_PRICE_STANDARD=<price_… mensuel> STRIPE_PRICE_PREMIUM=<price_… mensuel>   STRIPE_PRICE_STANDARD_YEAR=<price_… annuel> STRIPE_PRICE_PREMIUM_YEAR=<price_… annuel>
 npx supabase functions deploy checkout
 npx supabase functions deploy billing-portal
 npx supabase functions deploy stripe-webhook --no-verify-jwt
 ```
 
 4. Les prix affichés dans l'appli : `PLAN_PRICES` dans `src/config.js`
-   (texte libre, ex. « 19 € / mois »).
+   (par formule, mensuel et annuel). Le tarif de lancement se fait par un code
+   promo Stripe (déjà accepté sur la page de paiement).
 
 Tester d'abord en **mode test** Stripe (clés `sk_test_…`, carte 4242 4242 4242 4242).
 Quand un abonnement se termine, le grimpeur repasse en « essai terminé » :

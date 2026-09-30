@@ -77,6 +77,9 @@ test("abonnement → formule : active tant que payée, essai expiré ensuite", (
   assert.equal(planFromSubscription(sub("past_due", "price_s"), prices).plan, "standard");
   assert.deepEqual(planFromSubscription(sub("canceled", "price_p"), prices), { plan: "trial", status: "canceled", ended: true });
   assert.equal(planFromSubscription(sub("active", "price_other"), prices).plan, "trial");
+  const both = { standard: ["price_s", "price_sy"], premium: ["price_p", "price_py"] };
+  assert.equal(planFromSubscription(sub("active", "price_py"), both).plan, "premium", "prix annuel reconnu");
+  assert.equal(planFromSubscription(sub("active", "price_s"), { standard: ["price_s", null], premium: [null, null] }).plan, "standard");
 });
 
 /* ---------- relances ---------- */

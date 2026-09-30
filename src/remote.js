@@ -299,8 +299,8 @@ const Remote = {
 
   /* ---------- abonnement (Stripe, Edge Functions checkout / billing-portal) ---------- */
   /** Page de paiement Stripe pour cette formule ; lève une erreur si le paiement en ligne n'est pas en place. */
-  async checkout(plan){
-    const { data, error } = await this.client.functions.invoke("checkout", { body: { plan } });
+  async checkout(plan, period){
+    const { data, error } = await this.client.functions.invoke("checkout", { body: { plan, period: period === "year" ? "year" : "month" } });
     if (error || !data || !data.url) throw error || new Error("checkout unavailable");
     return data.url;
   },

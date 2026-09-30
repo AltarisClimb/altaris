@@ -526,6 +526,7 @@ function programModal(){
    reason (optionnel) : pourquoi on l'affiche (« la messagerie est réservée au Premium »…). */
 const PLAN_ROWS = [["pl.fTests", "fullTests"], ["pl.fProgram", "programWeeks"], ["pl.fLibrary", "train"],
                    ["pl.fMessaging", "messaging"], ["pl.fCalls", "calls"], ["pl.fVideo", "video"]];
+let period = "month";            // mensuel / annuel (comparaison des formules)
 function plansModal(reason){
   const me = Session.live(); if (!me) return;
   const cur = planOf(me);
@@ -539,6 +540,8 @@ function plansModal(reason){
     title: t("pl.title"), wide: true,
     body: '<div class="stack">' +
       (reason ? '<div class="notice acc">' + ic("info") + '<span>' + esc(reason) + '</span></div>' : '') +
+      '<div class="seg pk-period">' + ["month", "year"].map(p =>
+        '<button type="button" data-period="' + p + '" class="' + (period === p ? "on" : "") + '">' + esc(t("pl.period." + p)) + '</button>').join("") + '</div>' +
       '<div class="pk-grid">' + ["trial", "standard", "premium"].map(plan =>
         '<div class="pk' + (plan === cur || (plan === "trial" && cur === "expired") ? ' cur' : '') + (plan === "premium" ? ' best' : '') + '">' +
           '<div class="pk-h"><b>' + esc(t("plan." + plan)) + '</b><span class="small muted">' + esc(t("plan." + plan + "D")) + '</span></div>' +
@@ -546,7 +549,8 @@ function plansModal(reason){
           (plan === cur ? '<span class="chip acc">' + esc(t("pl.current")) + '</span>'
             : plan === "trial" ? (cur === "expired" ? '<span class="chip crit">' + esc(t("plan.expired")) + '</span>' : '')
             : '<button class="btn sm' + (plan === "premium" ? ' pri' : '') + '" data-req="' + plan + '">' + esc(t(me.subscriptionStatus ? "pl.switch" : "pl.subscribe")) + '</button>') +
-          (PLAN_PRICES[plan] ? '<span class="pk-price">' + esc(PLAN_PRICES[plan]) + '</span>' : '') +
+          (PLAN_PRICES[plan] && PLAN_PRICES[plan][period] ? '<span class="pk-price">' + esc(PLAN_PRICES[plan][period]) +
+            '<small>' + esc(t(period === "year" ? "pl.perYear" : "pl.perMonth")) + '</small></span>' : '') +
         '</div>').join("") + '</div>' +
       '<p class="dim tiny">' + esc(t("pl.payD")) + '</p>' +
       (me.subscriptionStatus ? '<button class="link small" data-portal>' + esc(t("pl.manage")) + '</button>' : '') +
@@ -559,7 +563,7 @@ function plansModal(reason){
         const plan = b.dataset.req;
         /* Abonné : changement de formule dans l'espace de facturation Stripe. Sinon, paiement en ligne. */
         if (Remote.client) try{
-          const url = me.subscriptionStatus ? await Remote.billingPortal() : await Remote.checkout(plan);
+          const url = me.subscriptionStatus ? await Remote.billingPortal() : await Remote.checkout(plan, period);
           audit("plan_checkout", plan);
           location.href = url;
           return;
@@ -569,6 +573,7 @@ function plansModal(reason){
         audit("plan_requested", plan);
         Modal.close(); toast(t("pl.requested", { plan: t("plan." + plan) }), "good");
       });
+      $$("[data-period]", root).forEach(b => b.onclick = () => { period = b.dataset.period; Modal.close(); plansModal(reason); });
       const portal = $("[data-portal]", root);
       if (portal) portal.onclick = async () => {
         try{ location.href = await Remote.billingPortal(); }catch(e){ toast(t("pl.portalFailed"), "crit"); }

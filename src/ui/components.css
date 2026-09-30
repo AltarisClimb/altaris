@@ -945,3 +945,5 @@ main > *{animation:fade-up .22s ease both}
 .pv-bar{height:28px}
 .pk-price{font:700 18px var(--sans)}
 @media (prefers-reduced-motion:reduce){ .pl-rec{animation:none} }
+.pk-period{align-self:center}
+.pk-price small{font-size:12px; font-weight:500; color:var(--ink-3)}

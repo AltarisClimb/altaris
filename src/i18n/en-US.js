@@ -1102,5 +1102,9 @@ export default {
   "em.on": "Every Monday morning: your past week, your streak and the sessions ahead.",
   "em.off": "Weekly recap turned off.",
   "em.disable": "Stop receiving it",
-  "em.enable": "Receive it"
+  "em.enable": "Receive it",
+  "pl.period.month": "Monthly",
+  "pl.period.year": "Yearly · 2 months free",
+  "pl.perMonth": " / month",
+  "pl.perYear": " / year"
 };

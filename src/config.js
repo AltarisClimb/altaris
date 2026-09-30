@@ -13,8 +13,11 @@ const SUPABASE_ANON_KEY = "sb_publishable_ncC6RsMSSBbpIeWLfD_csg_7vk_uCZh";
    Supabase (VAPID_PRIVATE_KEY), jamais ici. Vide = notifications désactivées. */
 const VAPID_PUBLIC_KEY = "";
 
-/* Prix affichés dans la comparaison des formules (texte libre, ex. « 19 € / mois »).
-   Vide = pas de prix affiché. Les vrais prix sont ceux de Stripe. */
-const PLAN_PRICES = { standard: "", premium: "" };
+/* Prix affichés dans la comparaison des formules, par période (texte libre).
+   Les vrais montants sont ceux de Stripe (secrets STRIPE_PRICE_*). */
+const PLAN_PRICES = {
+  standard: { month: "9,90 €", year: "99 €" },
+  premium:  { month: "49 €",   year: "490 €" }
+};
 
 export { PLAN_PRICES, SUPABASE_ANON_KEY, SUPABASE_URL, VAPID_PUBLIC_KEY };

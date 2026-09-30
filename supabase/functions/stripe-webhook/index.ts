@@ -1,12 +1,14 @@
 // POST /functions/v1/stripe-webhook  (called by Stripe, deployed with --no-verify-jwt)
 // The Stripe signature is the check. Keeps profiles.plan in line with the subscription:
 // bought plan while active, back to an expired trial when it ends.
-// Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_STANDARD, STRIPE_PRICE_PREMIUM.
+// Secrets: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_STANDARD[_YEAR], STRIPE_PRICE_PREMIUM[_YEAR].
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { planFromSubscription, stripe, verifySignature } from "../_shared/stripe.js";
 
 const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-const prices = { standard: Deno.env.get("STRIPE_PRICE_STANDARD"), premium: Deno.env.get("STRIPE_PRICE_PREMIUM") };
+const env = (k: string) => Deno.env.get(k) || null;
+const prices = { standard: [env("STRIPE_PRICE_STANDARD"), env("STRIPE_PRICE_STANDARD_YEAR")],
+                 premium: [env("STRIPE_PRICE_PREMIUM"), env("STRIPE_PRICE_PREMIUM_YEAR")] };
 
 async function apply(sub: any) {
   const secret = Deno.env.get("STRIPE_SECRET_KEY")!;

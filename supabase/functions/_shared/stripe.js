@@ -57,7 +57,8 @@ export async function verifySignature(payload, header, secret, tolerance, nowSec
  */
 export function planFromSubscription(sub, prices) {
   const priceId = sub && sub.items && sub.items.data && sub.items.data[0] && sub.items.data[0].price && sub.items.data[0].price.id;
-  const plan = priceId === prices.premium ? "premium" : priceId === prices.standard ? "standard" : null;
+  const has = (list) => !!priceId && [].concat(list || []).includes(priceId);
+  const plan = has(prices.premium) ? "premium" : has(prices.standard) ? "standard" : null;
   const live = ["active", "trialing", "past_due"].includes(sub && sub.status);
   return { plan: live && plan ? plan : "trial", status: (sub && sub.status) || "canceled", ended: !live || !plan };
 }
