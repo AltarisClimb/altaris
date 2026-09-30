@@ -24,3 +24,11 @@ test("index.html ne contient aucun script inline (interdit par script-src 'self'
   assert.deepEqual(inline.map(m => m[0].slice(0, 60)), []);
   assert.deepEqual(directive("script-src"), ["'self'"]);
 });
+
+test("vidéos et vocaux : lecture depuis Supabase Storage, micro autorisé pour l'appli", () => {
+  const media = directive("media-src");
+  if (SUPABASE_URL) assert.ok(media.includes("https://" + new URL(SUPABASE_URL).host), "media-src doit contenir le projet Supabase");
+  assert.ok(media.includes("blob:"), "media-src doit accepter blob: (aperçu local)");
+  const perms = vercel.headers.flatMap(h => h.headers).find(h => h.key === "Permissions-Policy").value;
+  assert.ok(perms.includes("microphone=(self)"), "le message vocal du coach a besoin du micro");
+});
