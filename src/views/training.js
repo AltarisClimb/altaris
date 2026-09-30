@@ -11,6 +11,7 @@ import { EXERCISES, exById, exName } from "../domain/exercises.js";
 import { EDGES, GEAR, hasGear } from "../domain/gear.js";
 import { exerciseHistory, fmtLoad, loggedExercises, suggestNext } from "../domain/loads.js";
 import { goalOf } from "../domain/periodization.js";
+import { adaptation } from "../domain/adapt.js";
 import { retestStatus } from "../domain/progress.js";
 import { TESTS, assessmentsOf } from "../domain/scoring.js";
 import { buildWarmup } from "../domain/warmup.js";
@@ -284,8 +285,33 @@ function freeSessionModal(onStart){
   });
 }
 
+/* ---------- plan qui s'adapte ---------- */
+/** Ajuste la prochaine séance si les signaux le justifient ; renvoie la séance ajustée ou null. */
+async function autoAdapt(userId){
+  const u = Store.get("users", userId); if (!u || u.role !== "climber") return null;
+  const a = adaptation({ sessions: sessionsOf(userId), pains: Store.list("pain").filter(p => p.userId === userId),
+    day: today(), painAlert: config().painAlert });
+  if (!a) return null;
+  const s = Store.get("sessions", a.sessionId);
+  const next = Object.assign({}, s, a.patch);
+  if (!await Store.put("sessions", s.id, next)) return null;
+  audit("session_adapted", s.id + " " + a.reason);
+  return next;
+}
+/** Phrase qui explique l'ajustement au grimpeur. */
+function adaptText(s){
+  return t("ad2." + s.adapted.reason, { title: s.title, date: fmtDate(s.date, { weekday: "long", day: "numeric", month: "long" }),
+    n: s.targetIntensity, min: s.plannedMin });
+}
+/** Encart de la fiche séance : explication, et « annuler » pour l'encadrant. */
+function adaptNotice(s, staff){
+  if (!s.adapted || s.status !== "planned") return "";
+  return '<div class="notice ' + (s.adapted.reason === "pain" ? "warn" : "acc") + '">' + ic("info") + '<span>' + esc(adaptText(s)) +
+    (staff ? ' <button class="link" data-adapt-undo>' + esc(t("ad2.undo")) + '</button>' : '') + '</span></div>';
+}
+
 /** Le grimpeur peut-il lancer une séance libre ? (formule) */
 const canTrainFree = (me) => !!me && me.role === "climber" && can(me, "train");
 
-export { benchPanel, canTrainFree, comparePanel, freeSessionModal, gearModal, gearSection, goalCard, goalModal, lineMini, loadsPanel,
+export { adaptNotice, adaptText, autoAdapt, benchPanel, canTrainFree, comparePanel, freeSessionModal, gearModal, gearSection, goalCard, goalModal, lineMini, loadsPanel,
          myTemplates, retestCard, saveTemplate, sessionLog, startAdhoc };

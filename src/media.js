@@ -84,4 +84,39 @@ function voiceRecorder(maxSec, onAuto){
   };
 }
 
-export { MAX_BYTES, canRecord, deleteMedia, mediaUrl, uploadMedia, voiceRecorder };
+/* ---------- démonstrations d'exercices (bucket "exercise-media") ---------- */
+const DEMO_BUCKET = "exercise-media";
+/** Lien direct vers un fichier vidéo (les liens YouTube, etc. s'ouvrent à part). */
+const isVideoFile = (p) => !!p && (!/^https?:/.test(p) || /\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(p));
+async function uploadDemo(key, blob){
+  if (blob.size > 100 * 1024 * 1024){ const e = new Error("too_big"); e.code = "too_big"; throw e; }
+  if (!Remote.client){
+    const path = "local:" + Date.now().toString(36) + "." + extOf(blob);
+    LOCAL.set(path, URL.createObjectURL(blob));
+    return path;
+  }
+  return Remote.uploadMedia(key, blob, extOf(blob), DEMO_BUCKET);
+}
+async function demoUrl(path){
+  if (!path) return null;
+  if (/^https?:/.test(path)) return path;
+  if (path.startsWith("local:")) return LOCAL.get(path) || null;
+  try{ return await Remote.mediaUrl(path, DEMO_BUCKET); }catch(e){ return null; }
+}
+async function deleteDemoFile(path){
+  if (!path || /^https?:/.test(path)) return;
+  if (path.startsWith("local:")){ LOCAL.delete(path); return; }
+  try{ await Remote.deleteMedia(path, DEMO_BUCKET); }catch(e){}
+}
+/** Remplit les <video data-demo="chemin"> présents sous root (lecture en boucle, sans son). */
+function bindDemos(root){
+  (root || document).querySelectorAll("video[data-demo]").forEach(async (v) => {
+    if (v.dataset.bound) return;
+    v.dataset.bound = "1";
+    const url = await demoUrl(v.dataset.demo);
+    if (!url){ v.closest("[data-demo-wrap]") ? v.closest("[data-demo-wrap]").hidden = true : v.remove(); return; }
+    v.src = url; v.play && v.play().catch(() => {});
+  });
+}
+
+export { MAX_BYTES, bindDemos, canRecord, deleteDemoFile, deleteMedia, demoUrl, isVideoFile, mediaUrl, uploadDemo, uploadMedia, voiceRecorder };

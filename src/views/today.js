@@ -20,6 +20,7 @@ import { callCard } from "./calls.js";
 import { getThread } from "./library.js";
 import { canTrainFree, goalCard, retestCard } from "./training.js";
 import { recapTeaser } from "./recap.js";
+import { signatureCard } from "./signature.js";
 import { unreadReview } from "./review.js";
 import { unreadVideo } from "./videos.js";
 
@@ -81,6 +82,7 @@ function viewToday(me){
           '<div class="row tight"><span class="chip">' + esc(t("st." + focus.type)) + '</span>' +
             '<span class="chip">' + esc(duration(focus.plannedMin)) + '</span>' +
             '<span class="chip">' + esc(t("cal.intensity", { n: focus.targetIntensity || 5 })) + '</span>' +
+            (focus.adapted ? '<span class="chip ' + (focus.adapted.reason === "pain" ? "warn" : "acc") + '" title="' + esc(t("ad2." + focus.adapted.reason, { title: focus.title, date: "", n: focus.targetIntensity, min: focus.plannedMin })) + '">' + esc(t("ad2.chip")) + '</span>' : '') +
             ((focus.exercises || []).length ? '<span class="chip">' + esc(t("td.exercises", { n: focus.exercises.length })) + '</span>' : '') + '</div>' +
         '</div>' +
         (first ? '<div class="td-fig">' + exercisePose(first.meta) + '</div>' : '') +
@@ -118,6 +120,7 @@ function viewToday(me){
         '<button class="btn sm pri" data-act="validate" data-v="' + esc(s.id) + '">' + esc(t("ov.validate")) + '</button></div>').join("") + '</div>' : '') +
 
     feedbackCards(me) +
+    (plan !== "expired" ? signatureCard(me, !!focus) : '') +
     recapTeaser(me) +
     (plan !== "expired" ? retestCard(me) : '') +
     goalCard(me, true) +

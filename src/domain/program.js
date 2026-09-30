@@ -50,7 +50,8 @@ function generateProgram(opts){
   const o = opts || {};
   const p = o.profile || {};
   const beginner = !["advanced"].includes(o.track);
-  const weeks = Math.max(1, Math.min(4, o.weeks || 4));
+  const weeks = Math.max(1, Math.min(o.maxWeeks || 4, o.weeks || 4));
+  const shift = o.intensityShift || 0;          // programme « retour » : tout un peu plus doux
   const from = o.from || addDays(today(), 1);
   const taken = new Set(o.taken || []);
   const days = ((p.availability || []).length ? p.availability : DEFAULT_DAYS)
@@ -113,10 +114,11 @@ function generateProgram(opts){
         userId: o.userId, date, time: slot.start || "18:00",
         title: (o.label ? o.label(theme.key, w + 1) : theme.key + " · S" + (w + 1)),
         type: theme.type, plannedMin: taper ? Math.max(45, Math.round(slotMinutes(slot) * 0.7 / 5) * 5) : slotMinutes(slot),
-        targetIntensity: phase ? (w === 3 && !taper ? INTENSITY[3] : PHASE_INTENSITY[phase]) : INTENSITY[w],
+        targetIntensity: Math.max(2, Math.min(9, (phase ? (w % 4 === 3 && !taper ? INTENSITY[3] : PHASE_INTENSITY[phase]) : INTENSITY[w % 4]) + shift)),
         exercises: warm.concat(main.slice(0, nMain), cool).map(e => e.id),
         notes: "", status: "planned",
-        program: Object.assign({ id: o.programId || "p", week: w + 1, theme: theme.key }, phase ? { phase } : {})
+        program: Object.assign({ id: o.programId || "p", week: w + 1, theme: theme.key }, phase ? { phase } : {},
+          o.signature ? { signature: o.signature, weeks } : {})
       });
     }
   }

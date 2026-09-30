@@ -2,6 +2,7 @@ import { $, $$, COPYRIGHT, addDays, esc, today, uid } from "./core.js";
 import { Access, Session, Store, audit, can, config, hasHealthConsent, planOf } from "./data.js";
 import { FEATURES } from "./domain/plans.js";
 import { Remote } from "./remote.js";
+import { PLAN_PRICES } from "./config.js";
 import { DEFAULT_TIME, sessionStart } from "./domain/calendar.js";
 import { EXERCISES, EX_CATS, EX_LV_COLOR, exById, exField, exName } from "./domain/exercises.js";
 import { boulderOptions, sportOptions, trackFor } from "./domain/grades.js";
@@ -20,7 +21,8 @@ import { ic } from "./ui/icons.js";
 import { PAIN_SITES, kpi, painLabel } from "./views/climber.js";
 import { exerciseModal, sendMessage } from "./views/library.js";
 import { DAYS, SESSION_TYPES, fNum, fRange, fSelect, fYear } from "./views/onboarding.js";
-import { saveTemplate, sessionLog } from "./views/training.js";
+import { adaptNotice, adaptText, autoAdapt, saveTemplate, sessionLog } from "./views/training.js";
+import { revertAdaptation } from "./domain/adapt.js";
 import { availGrid, bindAvailGrids } from "./views/availgrid.js";
 import { mountReview, openReview, reviewBlock } from "./views/review.js";
 import { videoNewModal } from "./views/videos.js";
@@ -43,6 +45,7 @@ function sessionSheet(id){
         '<span class="chip">' + esc(t("cal.targetInt")) + ' ' + (s.targetIntensity||5) + '/10</span>' +
         '<span class="chip ' + (s.status==="done"?"good":s.status==="missed"?"crit":"") + '">' + esc(t("cal."+(s.status==="done"?"done":s.status==="missed"?"missed":"planned"))) + '</span>' +
         (isCoach ? '<span class="chip">' + esc(u ? u.name : "") + '</span>' : '') + '</div>' +
+      adaptNotice(s, isCoach) +
       (s.notes ? '<div class="stack sm"><span class="eyebrow">' + esc(t("co.blockNotes")) + '</span>' +
         '<p class="small muted" style="line-height:1.6;white-space:pre-wrap">' + esc(s.notes) + '</p></div>' : '') +
       (exs.length ? '<div class="stack sm"><span class="eyebrow">' + esc(t("co.pickExercises")) + '</span>' +
@@ -70,6 +73,11 @@ function sessionSheet(id){
       const tp = $("[data-tpl]", root); if (tp) tp.onclick = async () => { tp.disabled = true; await saveTemplate(s.id); };
       const vid = $("[data-vid]", root); if (vid) vid.onclick = () => { Modal.close(); withPlan("video", "vd.why", () => videoNewModal(s.id)); };
       openReview(s);
+      const undo = $("[data-adapt-undo]", root);
+      if (undo) undo.onclick = async () => {
+        if (!await Store.put("sessions", s.id, revertAdaptation(Store.get("sessions", s.id)))) return;
+        audit("session_adapt_undone", s.id); Modal.close(); toast(t("ad2.undone"), "good");
+      };
       mountReview(root, s, () => Modal.close());
       const e = $("[data-edit]", root); if (e) e.onclick = () => { Modal.close(); blockEditor(s.userId, s.date, s.id); };
       const v = $("[data-val]", root); if (v) v.onclick = () => { Modal.close(); rpeModal(s.id); };
@@ -136,6 +144,8 @@ function rpeModal(id){
         Remote.notify({ kind: "done", athleteId: s.userId, sessionId: s.id });
         Modal.close();
         toast(t("rpe.validated"), "good");
+        const adapted = await autoAdapt(s.userId);
+        if (adapted) setTimeout(() => toast(adaptText(adapted)), 800);
       };
     }
   });
@@ -285,6 +295,8 @@ function painModal(){
         toast(shared ? t("pn.sent") : t("hc.localOnly"), shared ? "good" : undefined);
         if (["finger_a2","finger_a4","finger_other","elbow_med","elbow_lat","shoulder","wrist"].indexOf(site) >= 0)
           setTimeout(() => toast(t("pn.autoAdaptD"), "crit"), 700);
+        const adapted = await autoAdapt(me.id);
+        if (adapted) setTimeout(() => toast(adaptText(adapted), "crit"), 1500);
       };
     }
   });
@@ -489,7 +501,7 @@ function programModal(){
             '<span class="in-what">' + esc(s.exercises.map(id => { const e = exById(id); return e ? exName(e) : ""; }).filter(Boolean).join(" · ")) + '</span>' +
           '</span></div>').join("") + '</div></div>'
         : '<p class="small muted">' + esc(t("prg.nothing")) + '</p>') +
-      '<p class="dim tiny">' + esc(t("prg.coachNote")) + '</p>' +
+      '<p class="dim tiny">' + esc(t("prg.coachNote")) + ' <button class="link" data-act="signature">' + esc(t("sg.orSignature")) + '</button></p>' +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.cancel")) + '</button>' +
       (list.length ? '<button class="btn pri" id="prg-ok">' + ic("check") + esc(oldProgram.length ? t("prg.renew") : t("prg.create")) + '</button>' : ''),
@@ -533,20 +545,34 @@ function plansModal(reason){
           '<ul>' + PLAN_ROWS.map(([k, f]) => '<li><span>' + esc(t(k)) + '</span><b>' + cell(plan, f) + '</b></li>').join("") + '</ul>' +
           (plan === cur ? '<span class="chip acc">' + esc(t("pl.current")) + '</span>'
             : plan === "trial" ? (cur === "expired" ? '<span class="chip crit">' + esc(t("plan.expired")) + '</span>' : '')
-            : '<button class="btn sm' + (plan === "premium" ? ' pri' : '') + '" data-req="' + plan + '">' + esc(t("pl.want")) + '</button>') +
+            : '<button class="btn sm' + (plan === "premium" ? ' pri' : '') + '" data-req="' + plan + '">' + esc(t(me.subscriptionStatus ? "pl.switch" : "pl.subscribe")) + '</button>') +
+          (PLAN_PRICES[plan] ? '<span class="pk-price">' + esc(PLAN_PRICES[plan]) + '</span>' : '') +
         '</div>').join("") + '</div>' +
-      '<p class="dim tiny">' + esc(t("pl.howD")) + '</p>' +
+      '<p class="dim tiny">' + esc(t("pl.payD")) + '</p>' +
+      (me.subscriptionStatus ? '<button class="link small" data-portal>' + esc(t("pl.manage")) + '</button>' : '') +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>',
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
       $$("[data-req]", root).forEach(b => b.onclick = async () => {
         b.disabled = true;
-        try{ if (Remote.client) await Remote.requestPlan(b.dataset.req); }
+        const plan = b.dataset.req;
+        /* Abonné : changement de formule dans l'espace de facturation Stripe. Sinon, paiement en ligne. */
+        if (Remote.client) try{
+          const url = me.subscriptionStatus ? await Remote.billingPortal() : await Remote.checkout(plan);
+          audit("plan_checkout", plan);
+          location.href = url;
+          return;
+        }catch(e){ /* paiement en ligne pas encore en place : demande à l'équipe */ }
+        try{ if (Remote.client) await Remote.requestPlan(plan); }
         catch(e){ b.disabled = false; return toast(t("er.saveFailed"), "crit"); }
-        audit("plan_requested", b.dataset.req);
-        Modal.close(); toast(t("pl.requested", { plan: t("plan." + b.dataset.req) }), "good");
+        audit("plan_requested", plan);
+        Modal.close(); toast(t("pl.requested", { plan: t("plan." + plan) }), "good");
       });
+      const portal = $("[data-portal]", root);
+      if (portal) portal.onclick = async () => {
+        try{ location.href = await Remote.billingPortal(); }catch(e){ toast(t("pl.portalFailed"), "crit"); }
+      };
     }
   });
 }

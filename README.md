@@ -245,6 +245,54 @@ demanderont leurs propres tables.
 
 ---
 
+### Abonnement en ligne (Stripe)
+
+Trois fonctions : `checkout` (page de paiement), `billing-portal` (carte,
+factures, changement de formule, résiliation) et `stripe-webhook` (seule à
+changer la formule d'un grimpeur, d'après Stripe). Sans elles, le bouton
+« S'abonner » envoie une demande à l'admin comme avant.
+
+1. Dans Stripe : créer un produit par formule (Standard, Premium) avec un prix
+   mensuel récurrent ; noter les deux identifiants `price_…`. Activer le
+   portail client (Settings → Billing → Customer portal).
+2. Webhook (Developers → Webhooks) vers
+   `https://bunfdvzedeosliwylbzn.supabase.co/functions/v1/stripe-webhook`,
+   événements `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted` ; noter le
+   secret de signature `whsec_…`.
+3. Secrets et déploiement (les clés secrètes ne vont jamais dans le dépôt) :
+
+```bash
+npx supabase secrets set STRIPE_SECRET_KEY=<sk_…> STRIPE_WEBHOOK_SECRET=<whsec_…> \
+  STRIPE_PRICE_STANDARD=<price_…> STRIPE_PRICE_PREMIUM=<price_…>
+npx supabase functions deploy checkout
+npx supabase functions deploy billing-portal
+npx supabase functions deploy stripe-webhook --no-verify-jwt
+```
+
+4. Les prix affichés dans l'appli : `PLAN_PRICES` dans `src/config.js`
+   (texte libre, ex. « 19 € / mois »).
+
+Tester d'abord en **mode test** Stripe (clés `sk_test_…`, carte 4242 4242 4242 4242).
+Quand un abonnement se termine, le grimpeur repasse en « essai terminé » :
+ses données restent, l'entraînement se ferme.
+
+### Relances (série en jeu, e-mail du lundi)
+
+La fonction `remind` (toutes les 5 min) envoie aussi, à l'heure locale de
+chaque grimpeur : le dimanche à 18 h une notification si sa série de semaines
+est en jeu, le lundi à 8 h un e-mail récapitulatif (semaine passée, série,
+séances prévues) si l'option est active dans son profil. L'e-mail part par
+l'API de Brevo :
+
+```bash
+npx supabase secrets set BREVO_API_KEY=<clé API Brevo> MAIL_FROM=noreply@altaris-climb.com
+npx supabase functions deploy remind --no-verify-jwt
+```
+
+L'adresse d'expédition doit appartenir au domaine validé dans Brevo.
+
+
 ## 6. Ce que je déconseille pour l'instant
 
 **Ne réécris pas en Next.js maintenant.** Tu n'as aucune raison technique de le

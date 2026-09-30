@@ -621,11 +621,17 @@ const exField = (e, f) => (e[f] || "|").split("|")[LI()];
 const exById  = (id) => EXERCISES.find(e => e.id === id)
   || (REPLACED[id] && EXERCISES.find(e => e.id === REPLACED[id]))
   || _X.find(e => e.id === id);
-/** Video: the database value wins; otherwise the coach-supplied URL kept in config. */
+/* Vidéos de démonstration (table exercise_demos en mode Supabase), par id d'exercice. */
+let DEMOS = {};
+function setDemos(map){ DEMOS = {}; Object.entries(map || {}).forEach(([k, v]) => { if (v) DEMOS[k] = v; }); }
+const demosNow = () => Object.assign({}, DEMOS);
+/** Démonstration : fichier du bucket, lien, ou valeur locale (config) en mode démo. */
 function exVideo(id){
-  const e = EXERCISES.find(x => x.id === id);
+  const e = exById(id);
+  const key = e ? e.id : id;
+  if (DEMOS[key]) return DEMOS[key];
   if (e && e.video) return e.video;
-  const v = Store.get("config", "videos") || {}; return v[id] || null;
+  const v = Store.get("config", "videos") || {}; return v[key] || null;
 }
 async function setExVideo(id, url){
   const v = Object.assign({}, Store.get("config", "videos") || {});
@@ -637,4 +643,4 @@ async function setExVideo(id, url){
 const EX_LV_LB = { all:["Tous niveaux","All levels"], inter:["Intermédiaire +","Intermediate +"], adv:["Avancé / Expert","Advanced / Expert"] };
 const EX_LV_COLOR = { all:"var(--good)", inter:"var(--warn)", adv:"var(--crit)" };
 
-export { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, REPLACED, X, _X, exById, exField, exName, exVideo, fromRow, setExVideo, setExercises };
+export { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, REPLACED, X, _X, exById, exField, exName, exVideo, fromRow, demosNow, setDemos, setExVideo, setExercises };

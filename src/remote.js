@@ -46,7 +46,9 @@ function fromProfile(p){
     lang: p.lang || null,
     lastSeenAt: p.last_seen_at ? Date.parse(p.last_seen_at) : null,
     plan: p.plan || "trial",
-    trialEndsAt: p.trial_ends_at ? Date.parse(p.trial_ends_at) : null
+    trialEndsAt: p.trial_ends_at ? Date.parse(p.trial_ends_at) : null,
+    subscriptionStatus: p.subscription_status || null,
+    weeklyEmail: p.weekly_email !== false
   };
 }
 
@@ -57,6 +59,7 @@ function profilePatch(before, after){
   if (before.role !== after.role) patch.role = ROLE_OUT[after.role];
   if (before.status !== after.status) patch.status = after.status;
   if (after.plan && before.plan !== after.plan) patch.plan = after.plan;
+  if (after.weeklyEmail !== undefined && before.weeklyEmail !== after.weeklyEmail) patch.weekly_email = !!after.weeklyEmail;
   if ((before.trialEndsAt || null) !== (after.trialEndsAt || null))
     patch.trial_ends_at = after.trialEndsAt ? new Date(after.trialEndsAt).toISOString() : null;
   if ((before.coachId || null) !== (after.coachId || null) || patch.role){
@@ -120,7 +123,7 @@ const Remote = {
   /** Profils visibles par l'utilisateur connecté (filtrés par la RLS). */
   async profiles(){
     const { data, error } = await this.client.from("profiles")
-      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at");
+      .select("id, email, full_name, role, status, teacher_id, created_at, health_consent_at, timezone, lang, last_seen_at, plan, trial_ends_at, subscription_status, weekly_email");
     if (error) throw error;
     return data.map(fromProfile);
   },
@@ -176,24 +179,41 @@ const Remote = {
 
   /* ---------- fichiers (bucket privé "media" : vidéos, vocaux) ----------
      Un dossier par grimpeur ; la RLS de Storage suit celle des documents. */
-  async uploadMedia(athleteId, blob, ext){
+  async uploadMedia(athleteId, blob, ext, bucket){
     const path = athleteId + "/" + (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36)) + "." + ext;
-    const { error } = await this.client.storage.from("media").upload(path, blob, { contentType: blob.type || undefined, upsert: false });
+    const { error } = await this.client.storage.from(bucket || "media").upload(path, blob, { contentType: blob.type || undefined, upsert: false });
     if (error) throw error;
     return path;
   },
   _signed: {},
   /** Lien de lecture temporaire (1 h), gardé 50 min. */
-  async mediaUrl(path){
-    const c = this._signed[path];
+  async mediaUrl(path, bucket){
+    const b = bucket || "media", key = b + ":" + path, c = this._signed[key];
     if (c && c.until > Date.now()) return c.url;
-    const { data, error } = await this.client.storage.from("media").createSignedUrl(path, 3600);
+    const { data, error } = await this.client.storage.from(b).createSignedUrl(path, 3600);
     if (error) throw error;
-    this._signed[path] = { url: data.signedUrl, until: Date.now() + 50 * 60000 };
+    this._signed[key] = { url: data.signedUrl, until: Date.now() + 50 * 60000 };
     return data.signedUrl;
   },
-  async deleteMedia(path){
-    const { error } = await this.client.storage.from("media").remove([path]);
+  async deleteMedia(path, bucket){
+    const { error } = await this.client.storage.from(bucket || "media").remove([path]);
+    if (error) throw error;
+  },
+
+  /* ---------- vidéos de démonstration des exercices (coachs, admins) ---------- */
+  async exerciseDemos(){
+    const { data, error } = await this.client.from("exercise_demos").select("exercise_id, path");
+    if (error) throw error;
+    return data;
+  },
+  async setDemo(exerciseUuid, path){
+    const { data: { user } } = await this.client.auth.getUser();
+    const { error } = await this.client.from("exercise_demos")
+      .upsert({ exercise_id: exerciseUuid, path, added_by: user.id, updated_at: new Date().toISOString() }, { onConflict: "exercise_id" });
+    if (error) throw error;
+  },
+  async deleteDemo(exerciseUuid){
+    const { error } = await this.client.from("exercise_demos").delete().eq("exercise_id", exerciseUuid);
     if (error) throw error;
   },
   /** Changements en direct (Realtime applique la même RLS).
@@ -275,6 +295,19 @@ const Remote = {
     const { data, error } = await this.client.from("profiles").update(patch).eq("id", id).select("id");
     if (error) throw error;
     if (!data.length) throw new Error("consent update not permitted");
+  },
+
+  /* ---------- abonnement (Stripe, Edge Functions checkout / billing-portal) ---------- */
+  /** Page de paiement Stripe pour cette formule ; lève une erreur si le paiement en ligne n'est pas en place. */
+  async checkout(plan){
+    const { data, error } = await this.client.functions.invoke("checkout", { body: { plan } });
+    if (error || !data || !data.url) throw error || new Error("checkout unavailable");
+    return data.url;
+  },
+  async billingPortal(){
+    const { data, error } = await this.client.functions.invoke("billing-portal", { body: {} });
+    if (error || !data || !data.url) throw error || new Error("portal unavailable");
+    return data.url;
   },
 
   /* ---------- notifications (Web Push) ---------- */

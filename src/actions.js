@@ -22,6 +22,7 @@ import { freeSessionModal, gearModal, goalModal } from "./views/training.js";
 import { videoModal, videoNewModal } from "./views/videos.js";
 import { ascentModal } from "./views/logbook.js";
 import { recapModal } from "./views/recap.js";
+import { planPreviewModal, signatureModal } from "./views/signature.js";
 import { sessionsOf } from "./views/climber.js";
 import { TABS, View } from "./views/shell.js";
 import { _timer, readRunnerFields, updateLiveMetric } from "./views/testing.js";
@@ -130,6 +131,11 @@ const ACTIONS = {
   "ascent-new": () => ascentModal(null),
   "ascent-edit": (v) => ascentModal(v),
   recap: (v) => recapModal(v),
+  "weekly-email": async () => {
+    const me = Session.live(); if (!me) return;
+    if (await Store.put("users", me.id, Object.assign({}, me, { weeklyEmail: me.weeklyEmail === false }))) toast(t("g.saved"), "good");
+  },
+  signature: () => withPlan("train", "pl.whyTrain", () => signatureModal()),
   "gear-edit": () => gearModal(),
   /* Séance libre : minuteur de suspension, échauffement express, modèles. */
   "free-session": () => withPlan("train", "pl.whyTrain", () => freeSessionModal((o) => {
@@ -238,8 +244,9 @@ const ACTIONS = {
     await Store.put("users", me.id, Object.assign({}, me, { profile }));
     audit("onboarding_complete", trackFor(profile));
     if (d.currentPain) setTimeout(() => painModal(), 400);
-    View.onb = null; View.tab = "overview"; window.scrollTo(0,0); render();
-    toast(t("on.done"), "good");
+    View.onb = null; View.tab = "today"; window.scrollTo(0,0); render();
+    if (!d.currentPain) setTimeout(() => planPreviewModal(), 300);
+    else toast(t("on.done"), "good");
   },
   "onb-addslot": () => {
     collectOnb();

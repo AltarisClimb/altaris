@@ -381,6 +381,26 @@ select t.ok('coach cannot delete the climber clip', t.rows('delete from storage.
 reset role;
 select t.as(null);
 
+-- ================= exercise demos, billing fields, weekly email
+select t.as(:T1); set role authenticated;
+select t.ok('coach adds a demo video to an exercise', t.rows('insert into exercise_demos (exercise_id, path) select id, ''demo/fd03.mp4'' from exercises where slug = ''fd03''') = 1);
+select t.ok('coach uploads the demo file', t.rows('insert into storage.objects (bucket_id, name) values (''exercise-media'', ''x/fd03.mp4'')') = 1);
+select t.err('a demo is credited to its real author', 'insert into exercise_demos (exercise_id, path, added_by) select id, ''x.mp4'', ' || quote_literal(:A) || ' from exercises where slug = ''fd02''');
+reset role;
+select t.as(:S1); set role authenticated;
+select t.ok('a climber sees the demo of an exercise they can see', (select count(*) from exercise_demos) = 1);
+select t.ok('a climber can play the demo file', (select count(*) from storage.objects where bucket_id = 'exercise-media') = 1);
+select t.err('a climber cannot add a demo', 'insert into exercise_demos (exercise_id, path) select id, ''y.mp4'' from exercises where slug = ''fd03''');
+select t.err('a climber cannot upload a demo file', 'insert into storage.objects (bucket_id, name) values (''exercise-media'', ''y.mp4'')');
+select t.ok('a climber turns the weekly email off', t.rows('update profiles set weekly_email = false where id = ' || quote_literal(:S1)) = 1);
+select t.err('a climber cannot set their billing customer', 'update profiles set stripe_customer_id = ''cus_x'' where id = ' || quote_literal(:S1));
+reset role;
+select t.as(:A); set role authenticated;
+select t.err('even an admin cannot fake a subscription status', 'update profiles set subscription_status = ''active'' where id = ' || quote_literal(:S1));
+reset role;
+select t.as(null);
+select t.ok('the payment webhook (service) sets billing fields', t.rows('update profiles set stripe_customer_id = ''cus_1'', subscription_status = ''active'', plan = ''standard'' where id = ' || quote_literal(:S1)) = 1);
+
 -- ================= anon
 select t.as(null); set role anon;
 select t.err('anon cannot read exercises', 'select count(*) from exercises');

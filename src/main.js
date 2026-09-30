@@ -1,7 +1,7 @@
 import { setRenderer } from "./bus.js";
 import { $ } from "./core.js";
 import { Session, Store } from "./data.js";
-import { fromRow, setExercises } from "./domain/exercises.js";
+import { EXERCISES, fromRow, setDemos, setExercises } from "./domain/exercises.js";
 import { LANG, t } from "./i18n/index.js";
 import { Remote } from "./remote.js";
 import { toast } from "./ui/feedback.js";
@@ -104,6 +104,12 @@ async function loadExercises(){
     try{ const rows = JSON.parse(localStorage.getItem(key) || "null"); if (rows) setExercises(rows.map(fromRow)); }catch(e2){}
   }
   try{ await Remote.loadAssignments(); }catch(e){ /* hors ligne : la liste d'affectations reste vide */ }
+  /* Vidéos de démonstration : par id d'exercice (slug). */
+  try{
+    const rows = await Remote.exerciseDemos(), map = {};
+    rows.forEach(r => { const e = EXERCISES.find(x => x.uuid === r.exercise_id); if (e) map[e.id] = r.path; });
+    setDemos(map);
+  }catch(e){}
   render();
 }
 
@@ -112,6 +118,7 @@ async function loadExercises(){
   document.documentElement.setAttribute("lang", LANG === "en" ? "en-US" : "fr-FR");
   /* Ouverture depuis une notification : /?tab=messages, /?tab=calendar… */
   const wantTab = new URLSearchParams(location.search).get("tab");
+  const billing = new URLSearchParams(location.search).get("billing");
   if (wantTab && !new URLSearchParams(location.search).get("token_hash")) history.replaceState(null, "", location.pathname + location.hash);
   await Store.init();
   if (Remote.enabled()){
@@ -126,6 +133,12 @@ async function loadExercises(){
     Remote.booting = false;
     loadExercises();
     if (Session.user) Store.startRemote();
+    /* Retour du paiement : le webhook met la formule à jour en quelques secondes. */
+    if (billing === "ok" && Session.user){
+      toast(t("pl.thanks"), "good");
+      setTimeout(() => Store.syncRemote(), 4000);
+      setTimeout(() => Store.syncRemote(), 12000);
+    }
   } else {
     Session.restore();
   }

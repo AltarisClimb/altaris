@@ -333,6 +333,9 @@ function inboxItems(me){
     if (rev.length) out.push({ sev: "msg", c, icon: "check", text: t("in.review", { n: rev.length, title: rev[rev.length - 1].title }), act: "session-open", v: rev[rev.length - 1].id, btn: t("in.comment") });
 
     const mine = sessionsOf(c.id);
+    const adapted = mine.find(s => s.status === "planned" && s.adapted && diffDays(s.date, today()) >= 0);
+    if (adapted) out.push({ sev: adapted.adapted.reason === "pain" ? "warn" : "info", c, icon: "trend",
+      text: t("in.adapted." + adapted.adapted.reason, { title: adapted.title }), act: "session-open", v: adapted.id, btn: t("in.open") });
     const late = mine.filter(s => s.status === "planned" && diffDays(today(), s.date) > 0 && diffDays(today(), s.date) <= 14).length;
     if (late) out.push({ sev: "warn", c, icon: "check", text: t("in.toValidate", { n: late }), act: "thread-go", btn: t("in.nudge") });
 

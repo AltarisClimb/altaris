@@ -9,7 +9,9 @@
    re-rendu complet (bindPlayer). */
 import { $, esc } from "../core.js";
 import { Session, Store, audit } from "../data.js";
-import { EXERCISES, exById, exField, exName } from "../domain/exercises.js";
+import { EXERCISES, exById, exField, exName, exVideo } from "../domain/exercises.js";
+import { bindDemos, isVideoFile } from "../media.js";
+import { adaptText, autoAdapt } from "./training.js";
 import { EDGES, edgeInText, nearestEdge } from "../domain/gear.js";
 import { parseDose } from "../domain/hang.js";
 import { SET_EFFORT, exerciseHistory, fmtLoad, suggestNext } from "../domain/loads.js";
@@ -118,6 +120,14 @@ const playerActions = {
     const p = View.player, s = Store.get("sessions", p.id);
     if (!p.rpe) return false;
     const earnedBefore = new Set(badgesOf(s.userId).filter(b => b.earned).map(b => b.id));
+    /* Records de charge : la meilleure charge de la séance dépasse tout l'historique de l'exercice. */
+    const history = sessionsOf(s.userId).filter(x => x.id !== s.id);
+    const records = Object.entries(p.log).map(([id, sets]) => {
+      const loads = (sets || []).map(x => x.load).filter(v => v != null && !isNaN(v));
+      if (!loads.length) return null;
+      const top = Math.max(...loads), h = exerciseHistory(history, id).map(x => x.top).filter(v => v != null);
+      return h.length && top > Math.max(...h) ? { exId: id, load: top, prev: Math.max(...h) } : null;
+    }).filter(Boolean);
     const min = Number(p.durInput) || elapsedMin(p);
     const done = p.done.length ? p.done : (s.exercises || []);
     const log = {};
@@ -130,8 +140,9 @@ const playerActions = {
     const me = Session.live(), all = sessionsOf(me.id);
     p.finished = { min, load: sessionLoad(p.rpe, min), done: done.length, total: (s.exercises || []).length,
                    week: weekProgress(all), streak: weekStreak(all),
-                   newBadges: badgesOf(s.userId).filter(b => b.earned && !earnedBefore.has(b.id)) };
+                   newBadges: badgesOf(s.userId).filter(b => b.earned && !earnedBefore.has(b.id)), records };
     Remote.notify({ kind: "done", athleteId: s.userId, sessionId: s.id });
+    p.finished.adapted = await autoAdapt(s.userId);
     if (tick){ clearInterval(tick); tick = null; }
     keepAwake(false);
     return true;
@@ -186,13 +197,15 @@ function viewPlayer(){
 
   const e = list[p.idx], key = e ? e.id : "_", sets = p.log[key] || [], tm = p.timer;
   const fig = e && exercisePose(e.meta);
+  const dv = e && exVideo(e.id), demo = dv && isVideoFile(dv) ? dv : null;
   const me = Session.live();
   const warm = p.idx === 0 && !hasWarmup(s, EXERCISES) ? buildWarmup(s, EXERCISES, ((me && me.profile) || {}).gear, 0) : [];
   return '<div class="pl">' + head + '<div class="pl-body stack">' +
     '<div class="small muted">' + esc(t("pl.step", { i: p.idx + 1, n })) + '</div>' +
     (warm.length ? '<div class="notice acc">' + ic("info") + '<span>' + esc(t("wu.missing", { n: warm.length })) +
       ' <button class="link" data-act="play-warmup">' + esc(t("wu.add")) + '</button></span></div>' : '') +
-    (fig ? '<div class="pl-fig">' + fig + '</div>' : '') +
+    (demo ? '<div class="pl-fig pl-demo" data-demo-wrap><video data-demo="' + esc(demo) + '" muted loop playsinline autoplay preload="auto"></video></div>'
+          : fig ? '<div class="pl-fig">' + fig + '</div>' : '') +
     '<h2 class="pl-h">' + esc(e ? exName(e) : s.title) + '</h2>' +
     (e && exField(e, "dose") ? '<div class="pl-dose">' + esc(exField(e, "dose")) + '</div>' : '') +
     (e && exField(e, "c") ? '<p class="small muted" style="line-height:1.55">' + esc(exField(e, "c")) + '</p>' : '') +
@@ -257,6 +270,10 @@ function viewDone(s, p, color){
     '</div>' +
     (f.newBadges.length ? '<div class="stack sm center"><span class="eyebrow acc">' + esc(t("pl.newBadge")) + '</span>' +
       '<div class="bd-grid bd-new">' + f.newBadges.map(badgeTile).join("") + '</div></div>' : '') +
+    (f.records && f.records.length ? '<div class="pl-rec"><span class="pl-rec-ic">🏆</span><div class="stack sm"><b>' + esc(t(f.records.length > 1 ? "pl.records" : "pl.record")) + '</b>' +
+      f.records.map(r => { const e = exById(r.exId); return '<span class="small">' + esc((e ? exName(e) : r.exId) + " · " + fmtLoad(r.load, t("hg.bw"))) +
+        ' <span class="muted">(' + esc(t("pl.recPrev", { v: fmtLoad(r.prev, t("hg.bw")) })) + ')</span></span>'; }).join("") + '</div></div>' : '') +
+    (f.adapted ? '<div class="notice acc">' + ic("info") + '<span>' + esc(adaptText(f.adapted)) + '</span></div>' : '') +
     (f.streak ? '<p class="center small">' + ic("trend") + ' ' + esc(t("pl.streak", { n: f.streak })) + '</p>' : '') +
     '<p class="center dim tiny">' + esc(t("pl.load", { n: fmtNum(f.load) })) + '</p>' +
     '<div class="pl-nav"><button class="btn ghost" data-act="play-message">' + ic("chat") + esc(t("pl.tellCoach")) + '</button>' +
@@ -267,6 +284,7 @@ function viewDone(s, p, color){
 /** Chrono et minuteur : repeints 4 fois par seconde, sans re-rendu complet. */
 function bindPlayer(){
   if (tick) clearInterval(tick);
+  bindDemos(document);
   const paint = () => {
     const p = View.player;
     if (!p || p.finished){ clearInterval(tick); tick = null; return; }

@@ -1,6 +1,7 @@
 import { $, $$, addDays, byId, esc, uid } from "../core.js";
 import { Access, Session, Store, audit, can, config, planOf } from "../data.js";
-import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, exById, exField, exName, exVideo, setExVideo } from "../domain/exercises.js";
+import { EXERCISES, EX_CATS, EX_LV_COLOR, EX_LV_LB, demosNow, exById, exField, exName, exVideo, setDemos, setExVideo } from "../domain/exercises.js";
+import { bindDemos, deleteDemoFile, isVideoFile, uploadDemo } from "../media.js";
 import { boulderLabel, sportLabel, trackFor } from "../domain/grades.js";
 import { trialDaysLeft } from "../domain/plans.js";
 import { latestAssessment } from "../domain/scoring.js";
@@ -138,19 +139,50 @@ function exerciseModal(id){
       '<div class="stripe crit stack sm" style="gap:3px"><span class="eyebrow">' + esc(t("ex.contra")) + '</span>' +
         '<p class="small muted" style="line-height:1.6">' + esc(exField(e, "contra")) + '</p></div>' +
       '<div class="stack sm"><span class="eyebrow">' + esc(t("ex.video")) + '</span>' +
-        (vid ? '<a class="btn sm" href="' + esc(vid) + '" target="_blank" rel="noopener noreferrer">' + ic("video") + esc(t("g.open")) + '</a>'
-             : '<p class="dim tiny">' + esc(t("ex.videoNone")) + '</p>') +
+        (vid && isVideoFile(vid) ? '<div class="ex-demo" data-demo-wrap><video data-demo="' + esc(vid) + '" muted loop playsinline autoplay controls preload="metadata"></video></div>'
+         : vid ? '<a class="btn sm" href="' + esc(vid) + '" target="_blank" rel="noopener noreferrer">' + ic("video") + esc(t("g.open")) + '</a>'
+         : '<p class="dim tiny">' + esc(t(isStaff(me) ? "dm.noneStaff" : "ex.videoNone")) + '</p>') +
         (isStaff(me) ?
-          '<span class="unit"><input class="inp" id="exv" placeholder="https://…" value="' + esc(vid||"") + '">' +
-          '<button class="u" id="exv-save" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("g.save")) + '</button></span>' : '') +
+          '<div class="row tight">' +
+            '<label class="btn sm" for="exv-file">' + ic("video") + esc(t(vid ? "dm.replace" : "dm.upload")) + '</label>' +
+            '<input type="file" id="exv-file" accept="video/mp4,video/quicktime,video/webm" hidden>' +
+            (vid ? '<button class="btn sm ghost" id="exv-del">' + ic("trash") + esc(t("dm.remove")) + '</button>' : '') + '</div>' +
+          '<span class="unit"><input class="inp" id="exv" placeholder="' + esc(t("dm.urlPh")) + '" value="' + esc(vid && /^https?:/.test(vid) ? vid : "") + '">' +
+          '<button class="u" id="exv-save" style="cursor:pointer;font-weight:600;color:var(--accent)">' + esc(t("g.save")) + '</button></span>' +
+          '<span class="dim tiny">' + esc(t("dm.hint")) + '</span>' : '') +
       '</div>' +
       assignSection(e, me) +
     '</div>',
     footer: '<button class="btn ghost" data-c>' + esc(t("g.close")) + '</button>',
     onMount(root){
       $("[data-c]", root).onclick = () => Modal.close();
+      bindDemos(root);
+      /* Vidéo de démonstration : fichier envoyé (bucket exercise-media) ou lien. */
+      const saveDemo = async (path) => {
+        const old = exVideo(id);
+        try{
+          if (Remote.client){ if (!e.uuid) throw new Error("no uuid"); path ? await Remote.setDemo(e.uuid, path) : await Remote.deleteDemo(e.uuid); }
+          else await setExVideo(id, path);
+        }catch(err){ return toast(t("er.saveFailed"), "crit"); }
+        if (old && old !== path) deleteDemoFile(old);
+        setDemos(Object.assign({}, demosNow(), { [e.id]: path || undefined }));
+        audit("exercise_video", id);
+        toast(t(path ? "dm.saved" : "g.deleted"), "good");
+        exerciseModal(id); render();
+      };
       const b = $("#exv-save", root);
-      if (b) b.onclick = async () => { await setExVideo(id, $("#exv", root).value.trim()); toast(t("g.saved"), "good"); Modal.close(); };
+      if (b) b.onclick = () => { const u = $("#exv", root).value.trim(); if (u && !/^https:\/\//.test(u)) return toast(t("dm.badUrl"), "crit"); saveDemo(u || null); };
+      const file = $("#exv-file", root);
+      if (file) file.onchange = async () => {
+        const f = file.files && file.files[0]; if (!f) return;
+        toast(t("vd.uploading"));
+        let path;
+        try{ path = await uploadDemo(e.uuid || e.id, f); }
+        catch(err){ return toast(t(err.code === "too_big" ? "dm.tooBig" : "rv.uploadFailed"), "crit"); }
+        saveDemo(path);
+      };
+      const del = $("#exv-del", root);
+      if (del) del.onclick = () => { if (confirm(t("dm.delConfirm"))) saveDemo(null); };
       /* Affectations : le serveur (RLS) vérifie que le grimpeur est bien le vôtre. */
       const reopen = () => { exerciseModal(id); render(); };
       const add = $("#exa-add", root);
@@ -276,6 +308,15 @@ function viewMessages(me){
    17. PROFILE + PAIN JOURNAL
    ================================================================ */
 /** Notifications de cet appareil (Web Push). L'état se lit de façon asynchrone, puis on réaffiche. */
+/** E-mail récapitulatif du lundi (grimpeur, mode Supabase) : activé par défaut, désactivable ici. */
+function emailSection(me){
+  if (!Remote.client || me.role !== "climber") return "";
+  const on = me.weeklyEmail !== false;
+  return '<div class="panel pad stack sm"><span class="eyebrow">' + esc(t("em.title")) + '</span>' +
+    '<p class="small muted">' + esc(t(on ? "em.on" : "em.off")) + '</p>' +
+    '<div class="row tight noprint"><button class="btn sm' + (on ? ' ghost' : ' pri') + '" data-act="weekly-email">' + esc(t(on ? "em.disable" : "em.enable")) + '</button></div></div>';
+}
+
 function notifSection(){
   if (!Remote.client || !VAPID_PUBLIC_KEY) return "";
   if (View.pushState === undefined){
@@ -344,6 +385,7 @@ function viewProfile(me){
     })() : '') +
 
     notifSection() +
+    emailSection(me) +
 
     /* Consentement santé (RGPD art. 9) : état, et le donner ou le retirer à tout moment. */
     (me.role === "climber" && Remote.client ? '<div class="panel pad stack sm">' +
