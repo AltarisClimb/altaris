@@ -899,6 +899,15 @@ main > *{animation:fade-up .22s ease both}
   animation:sp-rule 1.1s cubic-bezier(.2,.7,.1,1) 1.5s forwards}
 .sp-tag{font:500 10.5px/1 var(--sans); letter-spacing:.55em; padding-left:.55em; text-transform:uppercase;
   color:rgba(244,241,234,.6); opacity:0; animation:sp-fade 1s ease 1.85s forwards}
+/* Appli installée : le logo est déjà là (écran de lancement du système), il se pose puis le nom apparaît. */
+.sp.sp-app .sp-mark path{animation:none; fill-opacity:1; stroke:none}
+.sp.sp-app .sp-mark{animation:sp-settle 1.1s cubic-bezier(.2,.7,.1,1) both}
+.sp.sp-app .sp-glow{animation-delay:0s}
+.sp.sp-app .sp-word{animation-delay:.35s}
+.sp.sp-app .sp-rule{animation-delay:.9s}
+.sp.sp-app .sp-tag{animation-delay:1.2s}
+.sp.sp-app{animation-delay:2.3s}
+@keyframes sp-settle{from{transform:scale(1.5) translateY(18%)}}
 @keyframes sp-draw{to{stroke-dashoffset:0}}
 @keyframes sp-fill{to{fill-opacity:1; stroke-opacity:0}}
 @keyframes sp-rise{to{opacity:1; transform:none; filter:none}}
